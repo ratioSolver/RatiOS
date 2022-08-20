@@ -1,10 +1,9 @@
-#include <cstdio>
+#include "deliberative_manager.h"
 
 int main(int argc, char **argv)
 {
-  (void)argc;
-  (void)argv;
-
-  printf("hello world my_package package\n");
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<ratio::ros::deliberative_manager>());
+  rclcpp::shutdown();
   return 0;
 }
