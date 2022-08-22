@@ -5,7 +5,42 @@
 
 namespace ratio::ros
 {
-    deliberative_executor::deliberative_executor(deliberative_manager &d_mngr, const uint64_t &id, const std::vector<std::string> &domain_files, const std::vector<std::string> &requirements) : d_mngr(d_mngr), reasoner_id(id), slv(), exec(slv), dcl(*this), dsl(*this), del(*this) {}
+    deliberative_executor::deliberative_executor(deliberative_manager &d_mngr, const uint64_t &id, const std::vector<std::string> &domain_files, const std::vector<std::string> &requirements) : d_mngr(d_mngr), reasoner_id(id), slv(), exec(slv), dcl(*this), dsl(*this), del(*this)
+    {
+        // a new reasoner has just been created..
+        set_state(aerials::msg::DeliberativeState::CREATED);
+
+        try
+        {
+            // we read the domain files..
+            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Reading domain..", reasoner_id);
+            for (const auto &domain_file : domain_files)
+            {
+                RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] %s", reasoner_id, domain_file.c_str());
+            }
+            slv.read(domain_files);
+
+            // we read the requirements..
+            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Reading requirements..", reasoner_id);
+            for (const auto &requirement : requirements)
+            {
+                RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] %s", reasoner_id, requirement.c_str());
+                slv.read(requirement);
+            }
+
+            pending_requirements = true;
+        }
+        catch (const ratio::core::inconsistency_exception &e)
+        { // the problem is inconsistent..
+            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] The problem is inconsistent..", reasoner_id);
+            set_state(aerials::msg::DeliberativeState::INCONSISTENT);
+        }
+        catch (const ratio::core::unsolvable_exception &e)
+        { // the problem is unsolvable..
+            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] The problem is unsolvable..", reasoner_id);
+            set_state(aerials::msg::DeliberativeState::INCONSISTENT);
+        }
+    }
 
     void deliberative_executor::start_execution(const std::vector<std::string> &notify_start_ids, const std::vector<std::string> &notify_end_ids)
     {
@@ -22,6 +57,11 @@ namespace ratio::ros
     }
     void deliberative_executor::append_requirements(const std::vector<std::string> &requirements)
     {
+        if (state == aerials::msg::DeliberativeState::INCONSISTENT)
+        {
+            RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Reasoner #%lu is inconsistent..", reasoner_id);
+            return;
+        }
         try
         {
             RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Going at root level..", reasoner_id);
