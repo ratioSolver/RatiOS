@@ -44,6 +44,17 @@ namespace ratio::ros
 
     void deliberative_executor::start_execution(const std::vector<std::string> &notify_start_ids, const std::vector<std::string> &notify_end_ids)
     {
+        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Starting execution..", reasoner_id);
+
+        notify_start.clear();
+        for (const auto &pred : notify_start_ids)
+            notify_start.insert(&get_predicate(pred));
+        notify_end.clear();
+        for (const auto &pred : notify_end_ids)
+            notify_end.insert(&get_predicate(pred));
+
+        restart_execution = true;
+        set_state(aerials::msg::DeliberativeState::EXECUTING);
     }
     void deliberative_executor::tick()
     {
@@ -103,15 +114,69 @@ namespace ratio::ros
         state_msg.deliberative_state = state;
         d_mngr.state_publisher->publish(state_msg);
     }
+    ratio::core::predicate &deliberative_executor::get_predicate(const std::string &pred) const
+    {
+        std::vector<std::string> ids;
+        size_t start = 0, end = 0;
+        do
+        {
+            end = pred.find('.', start);
+            if (end == std::string::npos)
+                end = pred.length();
+            std::string token = pred.substr(start, end - start);
+            if (!token.empty())
+                ids.push_back(token);
+            start = end + 1;
+        } while (end < pred.length() && start < pred.length());
+
+        if (ids.size() == 1)
+            return slv.get_predicate(ids[0]);
+        else
+        {
+            ratio::core::type *tp = &slv.get_type(ids[0]);
+            for (size_t i = 1; i < ids.size(); ++i)
+                if (i == ids.size() - 1)
+                    return tp->get_predicate(ids[i]);
+                else
+                    tp = &tp->get_type(ids[i]);
+        }
+        // not found
+        throw std::out_of_range(pred);
+    }
 
     deliberative_executor::deliberative_core_listener::deliberative_core_listener(deliberative_executor &de) : core_listener(de.get_solver()), exec(de) {}
     void deliberative_executor::deliberative_core_listener::started_solving()
     {
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Started reasoning..", exec.reasoner_id);
+        exec.set_state(aerials::msg::DeliberativeState::REASONING);
     }
     void deliberative_executor::deliberative_core_listener::solution_found()
     {
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Solution found..", exec.reasoner_id);
+        exec.current_flaw = nullptr;
+        exec.current_resolver = nullptr;
+
+        auto timelines_msg = deliberative_tier::msg::Timelines();
+        timelines_msg.reasoner_id = exec.reasoner_id;
+        timelines_msg.update = deliberative_tier::msg::Timelines::STATE_CHANGED;
+
+        std::stringstream sss;
+        sss << ratio::solver::to_json(exec.slv).dump();
+        timelines_msg.state = sss.str();
+
+        const auto j_tls = ratio::solver::to_timelines(exec.slv);
+        for (size_t i = 0; i < static_cast<json::array &>(j_tls).size(); ++i)
+            timelines_msg.timelines.push_back(static_cast<json::array &>(j_tls)[i].dump());
+
+        timelines_msg.time.num = exec.current_time.numerator();
+        timelines_msg.time.den = exec.current_time.denominator();
+
+        for (const auto &atm : exec.executing)
+            timelines_msg.executing.push_back(get_id(*atm));
+
+        exec.d_mngr.timelines_publisher->publish(timelines_msg);
+
+        exec.set_state(exec.restart_execution ? aerials::msg::DeliberativeState::EXECUTING : aerials::msg::DeliberativeState::IDLE);
     }
     void deliberative_executor::deliberative_core_listener::inconsistent_problem()
     {

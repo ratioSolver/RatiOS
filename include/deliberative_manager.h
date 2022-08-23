@@ -8,6 +8,8 @@
 #include "aerials/srv/task_closer.hpp"
 #include "aerials/srv/task_executor.hpp"
 #include "aerials/msg/deliberative_state.hpp"
+#include "deliberative_tier/msg/graph.hpp"
+#include "deliberative_tier/msg/timelines.hpp"
 
 namespace ratio::ros
 {
@@ -38,6 +40,8 @@ namespace ratio::ros
     rclcpp::Service<aerials::srv::TaskCloser>::SharedPtr task_closer_server = create_service<aerials::srv::TaskCloser>("task_closer", std::bind(&deliberative_manager::close_task, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     std::unordered_map<uint64_t, std::unique_ptr<deliberative_executor>> executors;
     rclcpp::Publisher<aerials::msg::DeliberativeState>::SharedPtr state_publisher = create_publisher<aerials::msg::DeliberativeState>("deliberative_state", rclcpp::QoS(10).transient_local());
+    rclcpp::Publisher<deliberative_tier::msg::Graph>::SharedPtr graph_publisher = create_publisher<deliberative_tier::msg::Graph>("graph", rclcpp::QoS(10).transient_local());
+    rclcpp::Publisher<deliberative_tier::msg::Timelines>::SharedPtr timelines_publisher = create_publisher<deliberative_tier::msg::Timelines>("timelines", rclcpp::QoS(10).transient_local());
     rclcpp::Client<aerials::srv::TaskExecutor>::SharedPtr can_start = create_client<aerials::srv::TaskExecutor>("can_start");
     rclcpp::Client<aerials::srv::TaskExecutor>::SharedPtr start_task = create_client<aerials::srv::TaskExecutor>("start_task");
     rclcpp::Client<aerials::srv::TaskExecutor>::SharedPtr can_end = create_client<aerials::srv::TaskExecutor>("can_end");

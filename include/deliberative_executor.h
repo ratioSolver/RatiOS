@@ -24,6 +24,7 @@ namespace ratio::ros
 
   private:
     void set_state(const unsigned int &state);
+    ratio::core::predicate &get_predicate(const std::string &pred) const;
 
   private:
     class deliberative_core_listener : public ratio::core::core_listener
@@ -89,6 +90,7 @@ namespace ratio::ros
     deliberative_solver_listener dsl;
     deliberative_executor_listener del;
     bool pending_requirements = false;
+    bool restart_execution = false;
     unsigned int state = -1;
     std::unordered_set<const ratio::core::predicate *> notify_start, notify_end;
     std::unordered_map<uintptr_t, const ratio::core::atom *> current_tasks;
@@ -97,5 +99,6 @@ namespace ratio::ros
     const ratio::solver::flaw *current_flaw = nullptr;
     const ratio::solver::resolver *current_resolver = nullptr;
     semitone::rational current_time;
+    std::unordered_set<ratio::core::atom *> executing;
   };
 } // namespace ratio::ros
