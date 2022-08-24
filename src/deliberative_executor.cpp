@@ -371,31 +371,122 @@ namespace ratio::ros
     deliberative_executor::deliberative_solver_listener::deliberative_solver_listener(deliberative_executor &de) : solver_listener(de.get_solver()), exec(de) {}
     void deliberative_executor::deliberative_solver_listener::flaw_created(const ratio::solver::flaw &f)
     {
+        exec.flaws.insert(&f);
+
+        auto fc_msg = deliberative_tier::msg::Flaw();
+        fc_msg.id = get_id(f);
+        for (const auto &r : f.get_causes())
+            fc_msg.causes.push_back(get_id(*r));
+        fc_msg.data = f.get_data().dump();
+        fc_msg.state = slv.get_sat_core()->value(f.get_phi());
+        const auto [lb, ub] = slv.get_idl_theory().bounds(f.get_position());
+        fc_msg.pos.lb = lb, fc_msg.pos.ub = ub;
+
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.flaws.push_back(fc_msg);
+        g_msg.update = deliberative_tier::msg::Graph::FLAW_CREATED;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::flaw_state_changed(const ratio::solver::flaw &f)
     {
+        auto fsc_msg = deliberative_tier::msg::Flaw();
+        fsc_msg.id = get_id(f);
+        fsc_msg.state = slv.get_sat_core()->value(f.get_phi());
+
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.flaws.push_back(fsc_msg);
+        g_msg.update = deliberative_tier::msg::Graph::FLAW_STATE_CHANGED;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::flaw_cost_changed(const ratio::solver::flaw &f)
     {
+        auto fcc_msg = deliberative_tier::msg::Flaw();
+        fcc_msg.id = get_id(f);
+        const auto est_cost = f.get_estimated_cost();
+        fcc_msg.cost.num = est_cost.numerator(), fcc_msg.cost.den = est_cost.denominator();
+
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.flaws.push_back(fcc_msg);
+        g_msg.update = deliberative_tier::msg::Graph::FLAW_COST_CHANGED;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::flaw_position_changed(const ratio::solver::flaw &f)
     {
+        auto fpc_msg = deliberative_tier::msg::Flaw();
+        fpc_msg.id = get_id(f);
+        const auto [lb, ub] = slv.get_idl_theory().bounds(f.get_position());
+        fpc_msg.pos.lb = lb, fpc_msg.pos.ub = ub;
+
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.flaws.push_back(fpc_msg);
+        g_msg.update = deliberative_tier::msg::Graph::FLAW_POSITION_CHANGED;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::current_flaw(const ratio::solver::flaw &f)
     {
+        exec.current_flaw = &f;
+
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.flaw_id = get_id(f);
+        g_msg.update = deliberative_tier::msg::Graph::CURRENT_FLAW;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
 
     void deliberative_executor::deliberative_solver_listener::resolver_created(const ratio::solver::resolver &r)
     {
+        exec.resolvers.insert(&r);
+
+        auto rc_msg = deliberative_tier::msg::Resolver();
+        rc_msg.id = get_id(r);
+        for (const auto &p : r.get_preconditions())
+            rc_msg.preconditions.push_back(get_id(*p));
+        rc_msg.effect = get_id(r.get_effect());
+        rc_msg.data = r.get_data().dump();
+        rc_msg.state = slv.get_sat_core()->value(r.get_rho());
+        const auto est_cost = r.get_intrinsic_cost();
+        rc_msg.intrinsic_cost.num = est_cost.numerator(), rc_msg.intrinsic_cost.den = est_cost.denominator();
+
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.resolvers.push_back(rc_msg);
+        g_msg.update = deliberative_tier::msg::Graph::RESOLVER_CREATED;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::resolver_state_changed(const ratio::solver::resolver &r)
     {
+        auto rsc_msg = deliberative_tier::msg::Resolver();
+        rsc_msg.id = get_id(r);
+        rsc_msg.state = slv.get_sat_core()->value(r.get_rho());
+
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.resolvers.push_back(rsc_msg);
+        g_msg.update = deliberative_tier::msg::Graph::RESOLVER_STATE_CHANGED;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::current_resolver(const ratio::solver::resolver &r)
     {
+        exec.current_resolver = &r;
+
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.resolver_id = get_id(r);
+        g_msg.update = deliberative_tier::msg::Graph::CURRENT_RESOLVER;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
 
     void deliberative_executor::deliberative_solver_listener::causal_link_added(const ratio::solver::flaw &f, const ratio::solver::resolver &r)
     {
+        auto g_msg = deliberative_tier::msg::Graph();
+        g_msg.reasoner_id = exec.get_reasoner_id();
+        g_msg.flaw_id = get_id(f);
+        g_msg.resolver_id = get_id(r);
+        g_msg.update = deliberative_tier::msg::Graph::CAUSAL_LINK_ADDED;
+        exec.d_mngr.graph_publisher->publish(g_msg);
     }
 } // namespace ratio::ros
