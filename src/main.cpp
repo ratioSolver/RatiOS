@@ -3,7 +3,10 @@
 int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<ratio::ros::deliberative_manager>());
+
+  ratio::ros::deliberative_manager dm;
+  rclcpp::spin(dm.get_node());
+
   rclcpp::shutdown();
   return 0;
 }

@@ -4,7 +4,7 @@ using namespace std::chrono_literals;
 
 namespace ratio::ros
 {
-    deliberative_manager::deliberative_manager() : Node("deliberative_manager"), timer(create_wall_timer(1s, std::bind(&deliberative_manager::tick, this)))
+    deliberative_manager::deliberative_manager() : timer(node->create_wall_timer(1s, std::bind(&deliberative_manager::tick, this)))
     {
         while (!can_start->wait_for_service(1s) || !start_task->wait_for_service(1s) || !can_end->wait_for_service(1s) || !end_task->wait_for_service(1s))
         {

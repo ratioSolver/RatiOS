@@ -144,6 +144,38 @@ namespace ratio::ros
         throw std::out_of_range(pred);
     }
 
+    aerials::msg::Task deliberative_executor::to_task(const ratio::core::atom &atm) const noexcept
+    {
+        aerials::msg::Task task;
+        task.reasoner_id = reasoner_id;
+        task.task_id = get_id(atm);
+        task.task_name = atm.get_type().get_name();
+
+        for (const auto &[name, xpr] : atm.get_vars())
+            if (name != RATIO_START && name != RATIO_END && name != RATIO_AT && name != TAU_KW)
+            {
+                task.par_names.push_back(name);
+                if (auto bi = dynamic_cast<ratio::core::bool_item *>(&*xpr))
+                    switch (atm.get_type().get_core().bool_value(*bi))
+                    {
+                    case semitone::True:
+                        task.par_values.push_back("true");
+                        break;
+                    case semitone::False:
+                        task.par_values.push_back("false");
+                        break;
+                    default:
+                        break;
+                    }
+                else if (auto ai = dynamic_cast<ratio::core::arith_item *>(&*xpr))
+                    task.par_values.push_back(to_string(atm.get_type().get_core().arith_value(*ai).get_rational()));
+                else if (auto si = dynamic_cast<ratio::core::string_item *>(&*xpr))
+                    task.par_values.push_back(si->get_value());
+            }
+
+        return task;
+    }
+
     deliberative_executor::deliberative_core_listener::deliberative_core_listener(deliberative_executor &de) : core_listener(de.get_solver()), exec(de) {}
     void deliberative_executor::deliberative_core_listener::started_solving()
     {
@@ -181,24 +213,137 @@ namespace ratio::ros
     void deliberative_executor::deliberative_core_listener::inconsistent_problem()
     {
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Inconsistent problem..", exec.reasoner_id);
+
+        exec.current_flaw = nullptr;
+        exec.current_resolver = nullptr;
+
+        exec.set_state(aerials::msg::DeliberativeState::INCONSISTENT);
     }
 
     deliberative_executor::deliberative_executor_listener::deliberative_executor_listener(deliberative_executor &de) : executor_listener(de.get_executor()), exec(de) {}
     void deliberative_executor::deliberative_executor_listener::tick(const semitone::rational &time)
     {
+        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Current time: %s", to_string(time).c_str());
+        exec.current_time = time;
+
+        auto timelines_msg = deliberative_tier::msg::Timelines();
+        timelines_msg.reasoner_id = exec.reasoner_id;
+        timelines_msg.update = deliberative_tier::msg::Timelines::TIME_CHANGED;
+        timelines_msg.time.num = exec.current_time.numerator();
+        timelines_msg.time.den = exec.current_time.denominator();
+        exec.d_mngr.timelines_publisher->publish(timelines_msg);
+
+        auto horizon = exec.slv.ratio::core::env::get("horizon");
+        if (exec.slv.ratio::core::core::arith_value(horizon) <= exec.exec.get_current_time() && exec.current_tasks.empty())
+        {
+            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Exhausted plan..", exec.reasoner_id);
+            exec.set_state(aerials::msg::DeliberativeState::FINISHED);
+        }
     }
     void deliberative_executor::deliberative_executor_listener::starting(const std::unordered_set<ratio::core::atom *> &atms)
     {
+        auto request = std::make_shared<aerials::srv::TaskExecutor::Request>();
+        std::vector<std::pair<rclcpp::Client<aerials::srv::TaskExecutor>::FutureAndRequestId, ratio::core::atom *>> futures;
+        futures.reserve(atms.size());
+        for (const auto &atm : atms)
+            if (exec.notify_start.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
+            {
+                request->task = exec.to_task(*atm);
+                futures.push_back({std::move(exec.d_mngr.can_start->async_send_request(request)), atm});
+            }
+        // we tell the executor the atoms which are not yet ready to start..
+        std::unordered_map<const ratio::core::atom *, semitone::rational> dsy;
+        for (auto &[ftr, atm] : futures)
+            if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
+            {
+                auto result = ftr.get();
+                if (!result->success)
+                    dsy[atm] = result->delay.den == 0 ? semitone::rational(1) : semitone::rational(result->delay.num, result->delay.den);
+            }
+            else
+            {
+                RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.can_start->get_service_name());
+            }
+
+        if (!dsy.empty())
+            exec.exec.dont_start_yet(dsy);
     }
     void deliberative_executor::deliberative_executor_listener::start(const std::unordered_set<ratio::core::atom *> &atms)
     {
+        auto request = std::make_shared<aerials::srv::TaskExecutor::Request>();
+        std::vector<std::pair<rclcpp::Client<aerials::srv::TaskExecutor>::FutureAndRequestId, ratio::core::atom *>> futures;
+        futures.reserve(atms.size());
+        for (const auto &atm : atms)
+            if (exec.notify_start.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
+            {
+                request->task = exec.to_task(*atm);
+                futures.push_back({std::move(exec.d_mngr.start_task->async_send_request(request)), atm});
+            }
+        for (auto &[ftr, atm] : futures)
+            if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
+            {
+                if (!ftr.get()->success)
+                {
+                    RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to start task `%s`", atm->get_type().get_name());
+                }
+            }
+            else
+            {
+                RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
+            }
     }
 
     void deliberative_executor::deliberative_executor_listener::ending(const std::unordered_set<ratio::core::atom *> &atms)
     {
+        auto request = std::make_shared<aerials::srv::TaskExecutor::Request>();
+        std::vector<std::pair<rclcpp::Client<aerials::srv::TaskExecutor>::FutureAndRequestId, ratio::core::atom *>> futures;
+        futures.reserve(atms.size());
+        for (const auto &atm : atms)
+            if (exec.notify_end.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
+            {
+                request->task = exec.to_task(*atm);
+                futures.push_back({std::move(exec.d_mngr.can_end->async_send_request(request)), atm});
+            }
+        // we tell the executor the atoms which are not yet ready to end..
+        std::unordered_map<const ratio::core::atom *, semitone::rational> dey;
+        for (auto &[ftr, atm] : futures)
+            if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
+            {
+                auto result = ftr.get();
+                if (!result->success)
+                    dey[atm] = result->delay.den == 0 ? semitone::rational(1) : semitone::rational(result->delay.num, result->delay.den);
+            }
+            else
+            {
+                RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.can_end->get_service_name());
+            }
+
+        if (!dey.empty())
+            exec.exec.dont_end_yet(dey);
     }
     void deliberative_executor::deliberative_executor_listener::end(const std::unordered_set<ratio::core::atom *> &atms)
     {
+        auto request = std::make_shared<aerials::srv::TaskExecutor::Request>();
+        std::vector<std::pair<rclcpp::Client<aerials::srv::TaskExecutor>::FutureAndRequestId, ratio::core::atom *>> futures;
+        futures.reserve(atms.size());
+        for (const auto &atm : atms)
+            if (exec.notify_end.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
+            {
+                request->task = exec.to_task(*atm);
+                futures.push_back({std::move(exec.d_mngr.end_task->async_send_request(request)), atm});
+            }
+        for (auto &[ftr, atm] : futures)
+            if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
+            {
+                if (!ftr.get()->success)
+                {
+                    RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to end task `%s`", atm->get_type().get_name());
+                }
+            }
+            else
+            {
+                RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
+            }
     }
 
     deliberative_executor::deliberative_solver_listener::deliberative_solver_listener(deliberative_executor &de) : solver_listener(de.get_solver()), exec(de) {}
