@@ -102,6 +102,5 @@ namespace ratio::ros
     const ratio::solver::flaw *current_flaw = nullptr;
     const ratio::solver::resolver *current_resolver = nullptr;
     semitone::rational current_time;
-    std::unordered_set<ratio::core::atom *> executing;
   };
 } // namespace ratio::ros

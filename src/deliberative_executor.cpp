@@ -203,8 +203,8 @@ namespace ratio::ros
         timelines_msg.time.num = exec.current_time.numerator();
         timelines_msg.time.den = exec.current_time.denominator();
 
-        for (const auto &atm : exec.executing)
-            timelines_msg.executing.push_back(get_id(*atm));
+        for (const auto &[id, atm] : exec.current_tasks)
+            timelines_msg.executing.push_back(id);
 
         exec.d_mngr.timelines_publisher->publish(timelines_msg);
 
@@ -279,18 +279,29 @@ namespace ratio::ros
                 request->task = exec.to_task(*atm);
                 futures.push_back({std::move(exec.d_mngr.start_task->async_send_request(request)), atm});
             }
+            else if (exec.notify_end.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
+                exec.current_tasks.emplace(get_id(*atm), atm);
         for (auto &[ftr, atm] : futures)
             if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
             {
-                if (!ftr.get()->success)
+                if (ftr.get()->success)
+                    exec.current_tasks.emplace(get_id(*atm), atm);
+                else
                 {
-                    RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to start task `%s`", atm->get_type().get_name());
+                    RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to start task `%s`", atm->get_type().get_name().c_str());
                 }
             }
             else
             {
                 RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
             }
+
+        auto timelines_msg = deliberative_tier::msg::Timelines();
+        timelines_msg.reasoner_id = exec.reasoner_id;
+        timelines_msg.update = deliberative_tier::msg::Timelines::EXECUTING_CHANGED;
+        for (const auto &[id, atm] : exec.current_tasks)
+            timelines_msg.executing.push_back(id);
+        exec.d_mngr.timelines_publisher->publish(timelines_msg);
     }
 
     void deliberative_executor::deliberative_executor_listener::ending(const std::unordered_set<ratio::core::atom *> &atms)
@@ -337,13 +348,24 @@ namespace ratio::ros
             {
                 if (!ftr.get()->success)
                 {
-                    RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to end task `%s`", atm->get_type().get_name());
+                    RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to end task `%s`", atm->get_type().get_name().c_str());
                 }
             }
             else
             {
                 RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
             }
+
+        // these atoms are now ended..
+        for (const auto &atm : atms)
+            exec.current_tasks.erase(get_id(*atm));
+
+        auto timelines_msg = deliberative_tier::msg::Timelines();
+        timelines_msg.reasoner_id = exec.reasoner_id;
+        timelines_msg.update = deliberative_tier::msg::Timelines::EXECUTING_CHANGED;
+        for (const auto &[id, atm] : exec.current_tasks)
+            timelines_msg.executing.push_back(id);
+        exec.d_mngr.timelines_publisher->publish(timelines_msg);
     }
 
     deliberative_executor::deliberative_solver_listener::deliberative_solver_listener(deliberative_executor &de) : solver_listener(de.get_solver()), exec(de) {}
