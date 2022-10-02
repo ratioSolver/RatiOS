@@ -2,6 +2,7 @@
 
 #include "executor_listener.h"
 #include "aerials/msg/task.hpp"
+#include "aerials/msg/deliberative_state.hpp"
 
 namespace ratio::ros
 {
@@ -19,6 +20,8 @@ namespace ratio::ros
     ratio::executor::executor &get_executor() { return exec; }
 
     void start_execution(const std::vector<std::string> &notify_start_ids, const std::vector<std::string> &notify_end_ids);
+    void pause_execution();
+    void stop_execution();
     void tick();
     void append_requirements(const std::vector<std::string> &requirements);
     void close_task(const uintptr_t &id, const bool &success = true);
@@ -93,8 +96,8 @@ namespace ratio::ros
     deliberative_solver_listener dsl;
     deliberative_executor_listener del;
     bool pending_requirements = false;
-    bool restart_execution = false;
-    unsigned int state = -1;
+    unsigned int current_state;
+    unsigned int previous_state = -1;
     std::unordered_set<const ratio::core::predicate *> notify_start, notify_end;
     std::unordered_map<uintptr_t, const ratio::core::atom *> current_tasks;
     std::unordered_set<const ratio::solver::flaw *> flaws;

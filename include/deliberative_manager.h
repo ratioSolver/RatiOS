@@ -3,11 +3,10 @@
 #include "rclcpp/rclcpp.hpp"
 #include "aerials/srv/reasoner_builder.hpp"
 #include "aerials/srv/reasoner_destroyer.hpp"
-#include "aerials/srv/executor.hpp"
+#include "aerials/srv/execution_service.hpp"
 #include "aerials/srv/requirement_manager.hpp"
 #include "aerials/srv/task_closer.hpp"
 #include "aerials/srv/task_executor.hpp"
-#include "aerials/msg/deliberative_state.hpp"
 #include "deliberative_tier/msg/graph.hpp"
 #include "deliberative_tier/msg/timelines.hpp"
 
@@ -28,7 +27,7 @@ namespace ratio::ros
     void tick();
 
     void create_reasoner(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::ReasonerBuilder::Request> req, std::shared_ptr<aerials::srv::ReasonerBuilder::Response> res);
-    void start_execution(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::Executor::Request> req, std::shared_ptr<aerials::srv::Executor::Response> res);
+    void execution_service(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::ExecutionService::Request> req, std::shared_ptr<aerials::srv::ExecutionService::Response> res);
     void destroy_reasoner(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::ReasonerDestroyer::Request> req, std::shared_ptr<aerials::srv::ReasonerDestroyer::Response> res);
     void new_requirements(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::RequirementManager::Request> req, std::shared_ptr<aerials::srv::RequirementManager::Response> res);
     void close_task(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskCloser::Request> req, std::shared_ptr<aerials::srv::TaskCloser::Response> res);
@@ -37,7 +36,7 @@ namespace ratio::ros
     rclcpp::Node::SharedPtr node = std::make_shared<rclcpp::Node>("deliberative_manager");
     rclcpp::TimerBase::SharedPtr timer;
     rclcpp::Service<aerials::srv::ReasonerBuilder>::SharedPtr create_reasoner_server = node->create_service<aerials::srv::ReasonerBuilder>("reasoner_builder", std::bind(&deliberative_manager::create_reasoner, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-    rclcpp::Service<aerials::srv::Executor>::SharedPtr start_execution_server = node->create_service<aerials::srv::Executor>("start_execution", std::bind(&deliberative_manager::start_execution, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    rclcpp::Service<aerials::srv::ExecutionService>::SharedPtr start_execution_server = node->create_service<aerials::srv::ExecutionService>("execution_service", std::bind(&deliberative_manager::execution_service, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Service<aerials::srv::ReasonerDestroyer>::SharedPtr reasoner_destroyer_server = node->create_service<aerials::srv::ReasonerDestroyer>("reasoner_destroyer", std::bind(&deliberative_manager::destroy_reasoner, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Service<aerials::srv::RequirementManager>::SharedPtr requirement_manager_server = node->create_service<aerials::srv::RequirementManager>("requirement_manager", std::bind(&deliberative_manager::new_requirements, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Service<aerials::srv::TaskCloser>::SharedPtr task_closer_server = node->create_service<aerials::srv::TaskCloser>("task_closer", std::bind(&deliberative_manager::close_task, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));

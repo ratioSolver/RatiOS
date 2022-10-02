@@ -29,16 +29,27 @@ namespace ratio::ros
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Creating new reasoner #%lu..", res->reasoner_id);
 
         executors[res->reasoner_id] = std::make_unique<deliberative_executor>(*this, res->reasoner_id, req->domain_files, req->requirements);
-        res->consistent = executors[res->reasoner_id]->state != aerials::msg::DeliberativeState::INCONSISTENT;
+        res->consistent = executors[res->reasoner_id]->current_state != aerials::msg::DeliberativeState::INCONSISTENT;
     }
 
-    void deliberative_manager::start_execution([[maybe_unused]] const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::Executor::Request> req, std::shared_ptr<aerials::srv::Executor::Response> res)
+    void deliberative_manager::execution_service([[maybe_unused]] const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::ExecutionService::Request> req, std::shared_ptr<aerials::srv::ExecutionService::Response> res)
     {
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Staarting execution for reasoner #%lu..", req->reasoner_id);
         if (const auto exec = executors.find(req->reasoner_id); exec != executors.end())
         {
-            exec->second->start_execution(req->notify_start, req->notify_end);
-            res->new_state = exec->second->state;
+            switch (req->command)
+            {
+            case aerials::srv::ExecutionService::Request::START:
+                exec->second->start_execution(req->notify_start, req->notify_end);
+                break;
+            case aerials::srv::ExecutionService::Request::PAUSE:
+                exec->second->pause_execution();
+                break;
+            case aerials::srv::ExecutionService::Request::STOP:
+                exec->second->stop_execution();
+                break;
+            }
+            res->new_state = exec->second->current_state;
         }
         else
         {
@@ -73,7 +84,7 @@ namespace ratio::ros
         if (const auto exec = executors.find(req->reasoner_id); exec != executors.end())
         {
             exec->second->append_requirements(req->requirements);
-            res->consistent = exec->second->state != aerials::msg::DeliberativeState::INCONSISTENT;
+            res->consistent = exec->second->current_state != aerials::msg::DeliberativeState::INCONSISTENT;
         }
         else
         {
