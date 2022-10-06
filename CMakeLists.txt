@@ -29,7 +29,7 @@ ament_target_dependencies(${PROJECT_NAME} rclcpp aerials)
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}_interfaces "rosidl_typesupport_cpp")
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 target_compile_features(${PROJECT_NAME} PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_link_libraries(${PROJECT_NAME} ${cpp_typesupport_target} PlExA oRatio ratioCore RiDDLe SeMiTONE json)
+target_link_libraries(${PROJECT_NAME} ${cpp_typesupport_target} PlExA oRatioSolver ratioCore RiDDLe SeMiTONE json)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION lib/${PROJECT_NAME})
 
