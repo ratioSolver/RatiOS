@@ -104,6 +104,14 @@ namespace ratio::ros
             set_state(aerials::msg::DeliberativeState::INCONSISTENT);
         }
     }
+    void deliberative_executor::lengthen_task(const uintptr_t &id, const semitone::rational &delay)
+    {
+        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Lengthning task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
+        std::unordered_map<const ratio::core::atom *, semitone::rational> dey;
+        dey[current_tasks.at(id)] = delay;
+        if (!dey.empty())
+            exec.dont_end_yet(dey);
+    }
     void deliberative_executor::close_task(const uintptr_t &id, const bool &success)
     {
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Closing task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());

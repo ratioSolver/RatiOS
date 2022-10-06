@@ -24,6 +24,7 @@ namespace ratio::ros
     void stop_execution();
     void tick();
     void append_requirements(const std::vector<std::string> &requirements);
+    void lengthen_task(const uintptr_t &id, const semitone::rational &delay = semitone::rational(1));
     void close_task(const uintptr_t &id, const bool &success = true);
 
   private:

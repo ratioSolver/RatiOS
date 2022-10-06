@@ -32,20 +32,20 @@ namespace ratio::ros
         res->consistent = executors[res->reasoner_id]->current_state != aerials::msg::DeliberativeState::INCONSISTENT;
     }
 
-    void deliberative_manager::execution_service([[maybe_unused]] const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::ExecutionService::Request> req, std::shared_ptr<aerials::srv::ExecutionService::Response> res)
+    void deliberative_manager::executor([[maybe_unused]] const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::Executor::Request> req, std::shared_ptr<aerials::srv::Executor::Response> res)
     {
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Staarting execution for reasoner #%lu..", req->reasoner_id);
         if (const auto exec = executors.find(req->reasoner_id); exec != executors.end())
         {
             switch (req->command)
             {
-            case aerials::srv::ExecutionService::Request::START:
+            case aerials::srv::Executor::Request::START:
                 exec->second->start_execution(req->notify_start, req->notify_end);
                 break;
-            case aerials::srv::ExecutionService::Request::PAUSE:
+            case aerials::srv::Executor::Request::PAUSE:
                 exec->second->pause_execution();
                 break;
-            case aerials::srv::ExecutionService::Request::STOP:
+            case aerials::srv::Executor::Request::STOP:
                 exec->second->stop_execution();
                 break;
             }
@@ -90,6 +90,21 @@ namespace ratio::ros
         {
             RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Reasoner #%lu does not exist..", req->reasoner_id);
             res->consistent = false;
+        }
+    }
+
+    void deliberative_manager::lengthen_task([[maybe_unused]] const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskLengthener::Request> req, std::shared_ptr<aerials::srv::TaskLengthener::Response> res)
+    {
+        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Stretching task %lu of reasoner #%lu..", req->task.task_id, req->task.reasoner_id);
+        if (const auto exec = executors.find(req->task.reasoner_id); exec != executors.end())
+        {
+            exec->second->lengthen_task(req->task.task_id, semitone::rational(req->delay.num, req->delay.den));
+            res->lengthened = true;
+        }
+        else
+        {
+            RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Reasoner #%lu does not exist..", req->task.reasoner_id);
+            res->lengthened = false;
         }
     }
 
