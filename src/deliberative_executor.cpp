@@ -15,17 +15,15 @@ namespace ratio::ros
             {
                 RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] %s", reasoner_id, domain_file.c_str());
             }
-            slv.read(domain_files);
+            exec.adapt(domain_files);
 
             // we read the requirements..
             RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Reading requirements..", reasoner_id);
             for (const auto &requirement : requirements)
             {
                 RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] %s", reasoner_id, requirement.c_str());
-                slv.read(requirement);
+                exec.adapt(requirement);
             }
-
-            pending_requirements = true;
         }
         catch (const ratio::core::inconsistency_exception &e)
         { // the problem is inconsistent..
@@ -64,11 +62,6 @@ namespace ratio::ros
     }
     void deliberative_executor::tick()
     {
-        if (pending_requirements)
-        { // we solve the problem again..
-            slv.solve();
-            pending_requirements = false;
-        }
         if (current_state == aerials::msg::DeliberativeState::EXECUTING)
             exec.tick();
     }
@@ -88,10 +81,8 @@ namespace ratio::ros
             for (const auto &requirement : requirements)
             {
                 RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] %s", reasoner_id, requirement.c_str());
-                slv.read(requirement);
+                exec.adapt(requirement);
             }
-
-            pending_requirements = true;
         }
         catch (const ratio::core::inconsistency_exception &e)
         { // the problem is inconsistent..
@@ -266,13 +257,6 @@ namespace ratio::ros
         timelines_msg.time.num = exec.current_time.numerator();
         timelines_msg.time.den = exec.current_time.denominator();
         exec.d_mngr.timelines_publisher->publish(timelines_msg);
-
-        auto horizon = exec.slv.ratio::core::env::get("horizon");
-        if (exec.slv.ratio::core::core::arith_value(horizon) <= exec.exec.get_current_time() && exec.current_tasks.empty())
-        {
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Exhausted plan..", exec.reasoner_id);
-            exec.set_state(aerials::msg::DeliberativeState::FINISHED);
-        }
     }
     void deliberative_executor::deliberative_executor_listener::starting(const std::unordered_set<ratio::core::atom *> &atms)
     {
@@ -380,7 +364,9 @@ namespace ratio::ros
         for (auto &[ftr, atm] : futures)
             if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
             {
-                if (!ftr.get()->success)
+                if (ftr.get()->success)
+                    exec.current_tasks.erase(get_id(*atm));
+                else
                 {
                     RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to end task `%s`", atm->get_type().get_name().c_str());
                 }
@@ -390,16 +376,21 @@ namespace ratio::ros
                 RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
             }
 
-        // these atoms are now ended..
-        for (const auto &atm : atms)
-            exec.current_tasks.erase(get_id(*atm));
-
         auto timelines_msg = deliberative_tier::msg::Timelines();
         timelines_msg.reasoner_id = exec.reasoner_id;
         timelines_msg.update = deliberative_tier::msg::Timelines::EXECUTING_CHANGED;
         for (const auto &[id, atm] : exec.current_tasks)
             timelines_msg.executing.push_back(id);
         exec.d_mngr.timelines_publisher->publish(timelines_msg);
+    }
+
+    void deliberative_executor::deliberative_executor_listener::finished()
+    {
+        if (exec.current_state != aerials::msg::DeliberativeState::FINISHED)
+        {
+            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Exhausted plan..", exec.reasoner_id);
+            exec.set_state(aerials::msg::DeliberativeState::FINISHED);
+        }
     }
 
     deliberative_executor::deliberative_solver_listener::deliberative_solver_listener(deliberative_executor &de) : solver_listener(de.get_solver()), exec(de) {}

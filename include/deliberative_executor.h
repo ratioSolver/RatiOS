@@ -62,6 +62,8 @@ namespace ratio::ros
       void ending(const std::unordered_set<ratio::core::atom *> &atms) override;
       void end(const std::unordered_set<ratio::core::atom *> &atms) override;
 
+      void finished() override;
+
     private:
       deliberative_executor &exec;
     };
@@ -96,7 +98,6 @@ namespace ratio::ros
     deliberative_core_listener dcl;
     deliberative_solver_listener dsl;
     deliberative_executor_listener del;
-    bool pending_requirements = false;
     unsigned int current_state;
     unsigned int previous_state = -1;
     std::unordered_set<const ratio::core::predicate *> notify_start, notify_end;
