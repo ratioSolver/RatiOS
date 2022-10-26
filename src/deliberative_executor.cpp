@@ -10,18 +10,18 @@ namespace ratio::ros
         try
         {
             // we read the domain files..
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Reading domain..", reasoner_id);
+            ROS_DEBUG("[%lu] Reading domain..", reasoner_id);
             for (const auto &domain_file : domain_files)
             {
-                RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] %s", reasoner_id, domain_file.c_str());
+                ROS_DEBUG("[%lu] %s", reasoner_id, domain_file.c_str());
             }
             slv.read(domain_files);
 
             // we read the requirements..
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Reading requirements..", reasoner_id);
+            ROS_DEBUG("[%lu] Reading requirements..", reasoner_id);
             for (const auto &requirement : requirements)
             {
-                RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] %s", reasoner_id, requirement.c_str());
+                ROS_DEBUG("[%lu] %s", reasoner_id, requirement.c_str());
                 slv.read(requirement);
             }
 
@@ -29,19 +29,19 @@ namespace ratio::ros
         }
         catch (const ratio::core::inconsistency_exception &e)
         { // the problem is inconsistent..
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] The problem is inconsistent..", reasoner_id);
-            set_state(aerials::msg::DeliberativeState::INCONSISTENT);
+            ROS_DEBUG("[%lu] The problem is inconsistent..", reasoner_id);
+            set_state(aerials::DeliberativeState::INCONSISTENT);
         }
         catch (const ratio::core::unsolvable_exception &e)
         { // the problem is unsolvable..
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] The problem is unsolvable..", reasoner_id);
-            set_state(aerials::msg::DeliberativeState::INCONSISTENT);
+            ROS_DEBUG("[%lu] The problem is unsolvable..", reasoner_id);
+            set_state(aerials::DeliberativeState::INCONSISTENT);
         }
     }
 
     void deliberative_executor::start_execution(const std::vector<std::string> &notify_start_ids, const std::vector<std::string> &notify_end_ids)
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Starting execution..", reasoner_id);
+        ROS_DEBUG("[%lu] Starting execution..", reasoner_id);
 
         notify_start.clear();
         for (const auto &pred : notify_start_ids)
@@ -50,17 +50,17 @@ namespace ratio::ros
         for (const auto &pred : notify_end_ids)
             notify_end.insert(&get_predicate(pred));
 
-        set_state(aerials::msg::DeliberativeState::EXECUTING);
+        set_state(aerials::DeliberativeState::EXECUTING);
     }
     void deliberative_executor::pause_execution()
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Pausing execution..", reasoner_id);
-        set_state(aerials::msg::DeliberativeState::PAUSED);
+        ROS_DEBUG("[%lu] Pausing execution..", reasoner_id);
+        set_state(aerials::DeliberativeState::PAUSED);
     }
     void deliberative_executor::stop_execution()
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Stopping execution..", reasoner_id);
-        set_state(aerials::msg::DeliberativeState::STOPPED);
+        ROS_DEBUG("[%lu] Stopping execution..", reasoner_id);
+        set_state(aerials::DeliberativeState::STOPPED);
     }
     void deliberative_executor::tick()
     {
@@ -69,25 +69,25 @@ namespace ratio::ros
             slv.solve();
             pending_requirements = false;
         }
-        if (current_state == aerials::msg::DeliberativeState::EXECUTING)
+        if (current_state == aerials::DeliberativeState::EXECUTING)
             exec.tick();
     }
     void deliberative_executor::append_requirements(const std::vector<std::string> &requirements)
     {
-        if (current_state == aerials::msg::DeliberativeState::INCONSISTENT)
+        if (current_state == aerials::DeliberativeState::INCONSISTENT)
         {
-            RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Reasoner #%lu is inconsistent..", reasoner_id);
+            ROS_WARN("Reasoner #%lu is inconsistent..", reasoner_id);
             return;
         }
         try
         {
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Going at root level..", reasoner_id);
+            ROS_DEBUG("[%lu] Going at root level..", reasoner_id);
             while (!slv.root_level()) // we go at root level..
                 slv.get_sat_core()->pop();
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Reading requirements..", reasoner_id);
+            ROS_DEBUG("[%lu] Reading requirements..", reasoner_id);
             for (const auto &requirement : requirements)
             {
-                RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] %s", reasoner_id, requirement.c_str());
+                ROS_DEBUG("[%lu] %s", reasoner_id, requirement.c_str());
                 slv.read(requirement);
             }
 
@@ -95,18 +95,18 @@ namespace ratio::ros
         }
         catch (const ratio::core::inconsistency_exception &e)
         { // the problem is inconsistent..
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] The problem is inconsistent..", reasoner_id);
-            set_state(aerials::msg::DeliberativeState::INCONSISTENT);
+            ROS_DEBUG("[%lu] The problem is inconsistent..", reasoner_id);
+            set_state(aerials::DeliberativeState::INCONSISTENT);
         }
         catch (const ratio::core::unsolvable_exception &e)
         { // the problem is unsolvable..
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] The problem is unsolvable..", reasoner_id);
-            set_state(aerials::msg::DeliberativeState::INCONSISTENT);
+            ROS_DEBUG("[%lu] The problem is unsolvable..", reasoner_id);
+            set_state(aerials::DeliberativeState::INCONSISTENT);
         }
     }
     void deliberative_executor::lengthen_task(const uintptr_t &id, const semitone::rational &delay)
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Lengthning task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
+        ROS_DEBUG("[%lu] Lengthning task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
         std::unordered_map<const ratio::core::atom *, semitone::rational> dey;
         dey[current_tasks.at(id)] = delay;
         if (!dey.empty())
@@ -114,7 +114,7 @@ namespace ratio::ros
     }
     void deliberative_executor::close_task(const uintptr_t &id, const bool &success)
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Closing task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
+        ROS_DEBUG("[%lu] Closing task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
         if (!success) // the task failed..
             exec.failure({current_tasks.at(id)});
         current_tasks.erase(id);
@@ -123,10 +123,10 @@ namespace ratio::ros
     void deliberative_executor::set_state(const unsigned int &st)
     {
         current_state = st;
-        auto state_msg = aerials::msg::DeliberativeState();
+        auto state_msg = aerials::DeliberativeState();
         state_msg.reasoner_id = reasoner_id;
         state_msg.deliberative_state = current_state;
-        d_mngr.state_publisher->publish(state_msg);
+        d_mngr.state_publisher.publish(state_msg);
     }
     ratio::core::predicate &deliberative_executor::get_predicate(const std::string &pred) const
     {
@@ -158,9 +158,9 @@ namespace ratio::ros
         throw std::out_of_range(pred);
     }
 
-    aerials::msg::Task deliberative_executor::to_task(const ratio::core::atom &atm) const noexcept
+    aerials::Task deliberative_executor::to_task(const ratio::core::atom &atm) const noexcept
     {
-        aerials::msg::Task task;
+        aerials::Task task;
         task.reasoner_id = reasoner_id;
         task.task_id = get_id(atm);
         task.task_name = atm.get_type().get_name();
@@ -193,25 +193,25 @@ namespace ratio::ros
     deliberative_executor::deliberative_core_listener::deliberative_core_listener(deliberative_executor &de) : core_listener(de.get_solver()), exec(de) {}
     void deliberative_executor::deliberative_core_listener::started_solving()
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Started reasoning..", exec.reasoner_id);
+        ROS_DEBUG("[%lu] Started reasoning..", exec.reasoner_id);
         if (exec.previous_state == -1u)
-            exec.set_state(aerials::msg::DeliberativeState::REASONING);
+            exec.set_state(aerials::DeliberativeState::REASONING);
         else
         { // we remember the current state for restoring it after adaptation..
-            assert(exec.current_state == aerials::msg::DeliberativeState::EXECUTING || exec.current_state == aerials::msg::DeliberativeState::PAUSED || exec.current_state == aerials::msg::DeliberativeState::STOPPED);
+            assert(exec.current_state == aerials::DeliberativeState::EXECUTING || exec.current_state == aerials::DeliberativeState::PAUSED || exec.current_state == aerials::DeliberativeState::STOPPED);
             exec.previous_state = exec.current_state;
-            exec.set_state(aerials::msg::DeliberativeState::ADAPTING);
+            exec.set_state(aerials::DeliberativeState::ADAPTING);
         }
     }
     void deliberative_executor::deliberative_core_listener::solution_found()
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Solution found..", exec.reasoner_id);
+        ROS_DEBUG("[%lu] Solution found..", exec.reasoner_id);
         exec.current_flaw = nullptr;
         exec.current_resolver = nullptr;
 
-        auto timelines_msg = deliberative_tier::msg::Timelines();
+        auto timelines_msg = deliberative_tier::Timelines();
         timelines_msg.reasoner_id = exec.reasoner_id;
-        timelines_msg.update = deliberative_tier::msg::Timelines::STATE_CHANGED;
+        timelines_msg.update = deliberative_tier::Timelines::STATE_CHANGED;
 
         std::stringstream sss;
         sss << ratio::solver::to_json(exec.slv).dump();
@@ -227,18 +227,18 @@ namespace ratio::ros
         for (const auto &[id, atm] : exec.current_tasks)
             timelines_msg.executing.push_back(id);
 
-        exec.d_mngr.timelines_publisher->publish(timelines_msg);
+        exec.d_mngr.timelines_publisher.publish(timelines_msg);
 
         switch (exec.previous_state)
         {
-        case aerials::msg::DeliberativeState::EXECUTING:
-            exec.set_state(aerials::msg::DeliberativeState::EXECUTING);
+        case aerials::DeliberativeState::EXECUTING:
+            exec.set_state(aerials::DeliberativeState::EXECUTING);
             break;
-        case aerials::msg::DeliberativeState::PAUSED:
-            exec.set_state(aerials::msg::DeliberativeState::PAUSED);
+        case aerials::DeliberativeState::PAUSED:
+            exec.set_state(aerials::DeliberativeState::PAUSED);
             break;
-        case aerials::msg::DeliberativeState::STOPPED:
-            exec.set_state(aerials::msg::DeliberativeState::STOPPED);
+        case aerials::DeliberativeState::STOPPED:
+            exec.set_state(aerials::DeliberativeState::STOPPED);
             break;
         default:
             break;
@@ -246,32 +246,32 @@ namespace ratio::ros
     }
     void deliberative_executor::deliberative_core_listener::inconsistent_problem()
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Inconsistent problem..", exec.reasoner_id);
+        ROS_DEBUG("[%lu] Inconsistent problem..", exec.reasoner_id);
 
         exec.current_flaw = nullptr;
         exec.current_resolver = nullptr;
 
-        exec.set_state(aerials::msg::DeliberativeState::INCONSISTENT);
+        exec.set_state(aerials::DeliberativeState::INCONSISTENT);
     }
 
     deliberative_executor::deliberative_executor_listener::deliberative_executor_listener(deliberative_executor &de) : executor_listener(de.get_executor()), exec(de) {}
     void deliberative_executor::deliberative_executor_listener::tick(const semitone::rational &time)
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Current time: %s", to_string(time).c_str());
+        ROS_DEBUG("Current time: %s", to_string(time).c_str());
         exec.current_time = time;
 
-        auto timelines_msg = deliberative_tier::msg::Timelines();
+        auto timelines_msg = deliberative_tier::Timelines();
         timelines_msg.reasoner_id = exec.reasoner_id;
-        timelines_msg.update = deliberative_tier::msg::Timelines::TIME_CHANGED;
+        timelines_msg.update = deliberative_tier::Timelines::TIME_CHANGED;
         timelines_msg.time.num = exec.current_time.numerator();
         timelines_msg.time.den = exec.current_time.denominator();
-        exec.d_mngr.timelines_publisher->publish(timelines_msg);
+        exec.d_mngr.timelines_publisher.publish(timelines_msg);
 
         auto horizon = exec.slv.ratio::core::env::get("horizon");
         if (exec.slv.ratio::core::core::arith_value(horizon) <= exec.exec.get_current_time() && exec.current_tasks.empty())
         {
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Exhausted plan..", exec.reasoner_id);
-            exec.set_state(aerials::msg::DeliberativeState::FINISHED);
+            ROS_DEBUG("[%lu] Exhausted plan..", exec.reasoner_id);
+            exec.set_state(aerials::DeliberativeState::FINISHED);
         }
     }
     void deliberative_executor::deliberative_executor_listener::starting(const std::unordered_set<ratio::core::atom *> &atms)
@@ -296,7 +296,7 @@ namespace ratio::ros
             }
             else
             {
-                RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.can_start->get_service_name());
+                ROS_ERROR("Failed to call service `%s`", exec.d_mngr.can_start->get_service_name());
             }
 
         if (!dsy.empty())
@@ -322,20 +322,20 @@ namespace ratio::ros
                     exec.current_tasks.emplace(get_id(*atm), atm);
                 else
                 {
-                    RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to start task `%s`", atm->get_type().get_name().c_str());
+                    ROS_WARN("Failed to start task `%s`", atm->get_type().get_name().c_str());
                 }
             }
             else
             {
-                RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
+                ROS_ERROR("Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
             }
 
-        auto timelines_msg = deliberative_tier::msg::Timelines();
+        auto timelines_msg = deliberative_tier::Timelines();
         timelines_msg.reasoner_id = exec.reasoner_id;
-        timelines_msg.update = deliberative_tier::msg::Timelines::EXECUTING_CHANGED;
+        timelines_msg.update = deliberative_tier::Timelines::EXECUTING_CHANGED;
         for (const auto &[id, atm] : exec.current_tasks)
             timelines_msg.executing.push_back(id);
-        exec.d_mngr.timelines_publisher->publish(timelines_msg);
+        exec.d_mngr.timelines_publisher.publish(timelines_msg);
     }
 
     void deliberative_executor::deliberative_executor_listener::ending(const std::unordered_set<ratio::core::atom *> &atms)
@@ -360,7 +360,7 @@ namespace ratio::ros
             }
             else
             {
-                RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.can_end->get_service_name());
+                ROS_ERROR("Failed to call service `%s`", exec.d_mngr.can_end->get_service_name());
             }
 
         if (!dey.empty())
@@ -382,24 +382,24 @@ namespace ratio::ros
             {
                 if (!ftr.get()->success)
                 {
-                    RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to end task `%s`", atm->get_type().get_name().c_str());
+                    ROS_WARN("Failed to end task `%s`", atm->get_type().get_name().c_str());
                 }
             }
             else
             {
-                RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
+                ROS_ERROR("Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
             }
 
         // these atoms are now ended..
         for (const auto &atm : atms)
             exec.current_tasks.erase(get_id(*atm));
 
-        auto timelines_msg = deliberative_tier::msg::Timelines();
+        auto timelines_msg = deliberative_tier::Timelines();
         timelines_msg.reasoner_id = exec.reasoner_id;
-        timelines_msg.update = deliberative_tier::msg::Timelines::EXECUTING_CHANGED;
+        timelines_msg.update = deliberative_tier::Timelines::EXECUTING_CHANGED;
         for (const auto &[id, atm] : exec.current_tasks)
             timelines_msg.executing.push_back(id);
-        exec.d_mngr.timelines_publisher->publish(timelines_msg);
+        exec.d_mngr.timelines_publisher.publish(timelines_msg);
     }
 
     deliberative_executor::deliberative_solver_listener::deliberative_solver_listener(deliberative_executor &de) : solver_listener(de.get_solver()), exec(de) {}
@@ -407,7 +407,7 @@ namespace ratio::ros
     {
         exec.flaws.insert(&f);
 
-        auto fc_msg = deliberative_tier::msg::Flaw();
+        auto fc_msg = deliberative_tier::Flaw();
         fc_msg.id = get_id(f);
         for (const auto &r : f.get_causes())
             fc_msg.causes.push_back(get_id(*r));
@@ -416,66 +416,66 @@ namespace ratio::ros
         const auto [lb, ub] = slv.get_idl_theory().bounds(f.get_position());
         fc_msg.pos.lb = lb, fc_msg.pos.ub = ub;
 
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.flaws.push_back(fc_msg);
-        g_msg.update = deliberative_tier::msg::Graph::FLAW_CREATED;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::FLAW_CREATED;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::flaw_state_changed(const ratio::solver::flaw &f)
     {
-        auto fsc_msg = deliberative_tier::msg::Flaw();
+        auto fsc_msg = deliberative_tier::Flaw();
         fsc_msg.id = get_id(f);
         fsc_msg.state = slv.get_sat_core()->value(f.get_phi());
 
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.flaws.push_back(fsc_msg);
-        g_msg.update = deliberative_tier::msg::Graph::FLAW_STATE_CHANGED;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::FLAW_STATE_CHANGED;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::flaw_cost_changed(const ratio::solver::flaw &f)
     {
-        auto fcc_msg = deliberative_tier::msg::Flaw();
+        auto fcc_msg = deliberative_tier::Flaw();
         fcc_msg.id = get_id(f);
         const auto est_cost = f.get_estimated_cost();
         fcc_msg.cost.num = est_cost.numerator(), fcc_msg.cost.den = est_cost.denominator();
 
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.flaws.push_back(fcc_msg);
-        g_msg.update = deliberative_tier::msg::Graph::FLAW_COST_CHANGED;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::FLAW_COST_CHANGED;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::flaw_position_changed(const ratio::solver::flaw &f)
     {
-        auto fpc_msg = deliberative_tier::msg::Flaw();
+        auto fpc_msg = deliberative_tier::Flaw();
         fpc_msg.id = get_id(f);
         const auto [lb, ub] = slv.get_idl_theory().bounds(f.get_position());
         fpc_msg.pos.lb = lb, fpc_msg.pos.ub = ub;
 
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.flaws.push_back(fpc_msg);
-        g_msg.update = deliberative_tier::msg::Graph::FLAW_POSITION_CHANGED;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::FLAW_POSITION_CHANGED;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::current_flaw(const ratio::solver::flaw &f)
     {
         exec.current_flaw = &f;
 
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.flaw_id = get_id(f);
-        g_msg.update = deliberative_tier::msg::Graph::CURRENT_FLAW;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::CURRENT_FLAW;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
 
     void deliberative_executor::deliberative_solver_listener::resolver_created(const ratio::solver::resolver &r)
     {
         exec.resolvers.insert(&r);
 
-        auto rc_msg = deliberative_tier::msg::Resolver();
+        auto rc_msg = deliberative_tier::Resolver();
         rc_msg.id = get_id(r);
         for (const auto &p : r.get_preconditions())
             rc_msg.preconditions.push_back(get_id(*p));
@@ -485,42 +485,42 @@ namespace ratio::ros
         const auto est_cost = r.get_intrinsic_cost();
         rc_msg.intrinsic_cost.num = est_cost.numerator(), rc_msg.intrinsic_cost.den = est_cost.denominator();
 
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.resolvers.push_back(rc_msg);
-        g_msg.update = deliberative_tier::msg::Graph::RESOLVER_CREATED;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::RESOLVER_CREATED;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::resolver_state_changed(const ratio::solver::resolver &r)
     {
-        auto rsc_msg = deliberative_tier::msg::Resolver();
+        auto rsc_msg = deliberative_tier::Resolver();
         rsc_msg.id = get_id(r);
         rsc_msg.state = slv.get_sat_core()->value(r.get_rho());
 
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.resolvers.push_back(rsc_msg);
-        g_msg.update = deliberative_tier::msg::Graph::RESOLVER_STATE_CHANGED;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::RESOLVER_STATE_CHANGED;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
     void deliberative_executor::deliberative_solver_listener::current_resolver(const ratio::solver::resolver &r)
     {
         exec.current_resolver = &r;
 
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.resolver_id = get_id(r);
-        g_msg.update = deliberative_tier::msg::Graph::CURRENT_RESOLVER;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::CURRENT_RESOLVER;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
 
     void deliberative_executor::deliberative_solver_listener::causal_link_added(const ratio::solver::flaw &f, const ratio::solver::resolver &r)
     {
-        auto g_msg = deliberative_tier::msg::Graph();
+        auto g_msg = deliberative_tier::Graph();
         g_msg.reasoner_id = exec.get_reasoner_id();
         g_msg.flaw_id = get_id(f);
         g_msg.resolver_id = get_id(r);
-        g_msg.update = deliberative_tier::msg::Graph::CAUSAL_LINK_ADDED;
-        exec.d_mngr.graph_publisher->publish(g_msg);
+        g_msg.update = deliberative_tier::Graph::CAUSAL_LINK_ADDED;
+        exec.d_mngr.graph_publisher.publish(g_msg);
     }
 } // namespace ratio::ros

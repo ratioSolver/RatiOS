@@ -1,8 +1,8 @@
 #pragma once
 
 #include "executor_listener.h"
-#include "aerials/msg/task.hpp"
-#include "aerials/msg/deliberative_state.hpp"
+#include "aerials/Task.h"
+#include "aerials/DeliberativeState.h"
 
 namespace ratio::ros
 {
@@ -31,7 +31,7 @@ namespace ratio::ros
     void set_state(const unsigned int &state);
     ratio::core::predicate &get_predicate(const std::string &pred) const;
 
-    aerials::msg::Task to_task(const ratio::core::atom &atm) const noexcept;
+    aerials::Task to_task(const ratio::core::atom &atm) const noexcept;
 
   private:
     class deliberative_core_listener : public ratio::core::core_listener

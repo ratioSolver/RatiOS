@@ -2,11 +2,18 @@
 
 int main(int argc, char **argv)
 {
-  rclcpp::init(argc, argv);
+  ros::init(argc, argv, "deliberative_tier");
+  ros::NodeHandle nh;
+  ROS_INFO("Starting the Deliberative Tier..");
 
-  ratio::ros::deliberative_manager dm;
-  rclcpp::spin(dm.get_node());
+  if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
+    ros::console::notifyLoggerLevelsChanged();
 
-  rclcpp::shutdown();
+  ratio::ros::deliberative_manager dm(nh);
+
+  ros::spin();
+
+  ros::shutdown();
+
   return 0;
 }
