@@ -43,7 +43,6 @@ namespace ratio::ros
     rclcpp::Service<aerials::srv::RequirementManager>::SharedPtr requirement_manager_server = node->create_service<aerials::srv::RequirementManager>("requirement_manager", std::bind(&deliberative_manager::new_requirements, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Service<aerials::srv::TaskLengthener>::SharedPtr task_lengthener_server = node->create_service<aerials::srv::TaskLengthener>("task_lengthner", std::bind(&deliberative_manager::lengthen_task, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Service<aerials::srv::TaskCloser>::SharedPtr task_closer_server = node->create_service<aerials::srv::TaskCloser>("task_closer", std::bind(&deliberative_manager::close_task, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-    std::unordered_map<uint64_t, std::unique_ptr<deliberative_executor>> executors;
     rclcpp::Publisher<aerials::msg::DeliberativeState>::SharedPtr state_publisher = node->create_publisher<aerials::msg::DeliberativeState>("deliberative_state", rclcpp::QoS(10).transient_local());
     rclcpp::Publisher<deliberative_tier::msg::Graph>::SharedPtr graph_publisher = node->create_publisher<deliberative_tier::msg::Graph>("graph", rclcpp::QoS(10).transient_local());
     rclcpp::Publisher<deliberative_tier::msg::Timelines>::SharedPtr timelines_publisher = node->create_publisher<deliberative_tier::msg::Timelines>("timelines", rclcpp::QoS(10).transient_local());
@@ -52,5 +51,6 @@ namespace ratio::ros
     rclcpp::Client<aerials::srv::TaskExecutor>::SharedPtr start_task = node->create_client<aerials::srv::TaskExecutor>("start_task", ::rmw_qos_profile_default, callback_group);
     rclcpp::Client<aerials::srv::TaskExecutor>::SharedPtr can_end = node->create_client<aerials::srv::TaskExecutor>("can_end", ::rmw_qos_profile_default, callback_group);
     rclcpp::Client<aerials::srv::TaskExecutor>::SharedPtr end_task = node->create_client<aerials::srv::TaskExecutor>("end_task", ::rmw_qos_profile_default, callback_group);
+    std::unordered_map<uint64_t, std::unique_ptr<deliberative_executor>> executors;
   };
 } // namespace ratio::ros
