@@ -11,7 +11,7 @@
 #include "deliberative_tier/Timelines.h"
 #include <ros/ros.h>
 
-namespace ratio::ros
+namespace ratio::ros1
 {
   class deliberative_executor;
 
@@ -27,12 +27,12 @@ namespace ratio::ros
   private:
     void tick();
 
-    void create_reasoner(aerials::ReasonerBuilder::Request &req, aerials::ReasonerBuilder::Response &res);
-    void executor(aerials::Executor::Request &req, aerials::Executor::Response &res);
-    void destroy_reasoner(aerials::ReasonerDestroyer::Request &req, aerials::ReasonerDestroyer::Response &res);
-    void new_requirements(aerials::RequirementManager::Request &req, aerials::RequirementManager::Response &res);
-    void lengthen_task(aerials::TaskLengthener::Request &req, aerials::TaskLengthener::Response &res);
-    void close_task(aerials::TaskCloser::Request &req, aerials::TaskCloser::Response &res);
+    bool create_reasoner(aerials::ReasonerBuilder::Request &req, aerials::ReasonerBuilder::Response &res);
+    bool executor(aerials::Executor::Request &req, aerials::Executor::Response &res);
+    bool destroy_reasoner(aerials::ReasonerDestroyer::Request &req, aerials::ReasonerDestroyer::Response &res);
+    bool new_requirements(aerials::RequirementManager::Request &req, aerials::RequirementManager::Response &res);
+    bool lengthen_task(aerials::TaskLengthener::Request &req, aerials::TaskLengthener::Response &res);
+    bool close_task(aerials::TaskCloser::Request &req, aerials::TaskCloser::Response &res);
 
   private:
     ros::NodeHandle &handle;
@@ -52,4 +52,4 @@ namespace ratio::ros
     ros::ServiceClient end_task;
     std::unordered_map<uint64_t, std::unique_ptr<deliberative_executor>> executors;
   };
-} // namespace ratio::ros
+} // namespace ratio::ros1

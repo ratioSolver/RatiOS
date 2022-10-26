@@ -9,7 +9,7 @@ int main(int argc, char **argv)
   if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
     ros::console::notifyLoggerLevelsChanged();
 
-  ratio::ros::deliberative_manager dm(nh);
+  ratio::ros1::deliberative_manager dm(nh);
 
   ros::spin();
 

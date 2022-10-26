@@ -2,10 +2,10 @@
 
 using namespace std::chrono_literals;
 
-namespace ratio::ros
+namespace ratio::ros1
 {
     deliberative_manager::deliberative_manager(ros::NodeHandle &h) : handle(h),
-                                                                     timer(h.createTimer(ros::Duration(1.0), std::bind(&deliberative_manager::tick, &dm))),
+                                                                     timer(h.createTimer(ros::Duration(1.0), std::bind(&deliberative_manager::tick, this))),
                                                                      create_reasoner_server(h.advertiseService("reasoner_builder", &deliberative_manager::create_reasoner, this)),
                                                                      start_execution_server(h.advertiseService("executor", &deliberative_manager::executor, this)),
                                                                      reasoner_destroyer_server(h.advertiseService("reasoner_destroyer", &deliberative_manager::destroy_reasoner, this)),
@@ -21,7 +21,7 @@ namespace ratio::ros
                                                                      end_task(h.serviceClient<aerials::TaskExecutor>("end_task"))
 
     {
-        while (!can_start.waitForExistence(1s) || !start_task.waitForExistence(1s) || !can_end.waitForExistence(1s) || !end_task.waitForExistence(1s))
+        while (!can_start.waitForExistence(ros::Duration(1.0)) || !start_task.waitForExistence(ros::Duration(1.0)) || !can_end.waitForExistence(ros::Duration(1.0)) || !end_task.waitForExistence(ros::Duration(1.0)))
         {
             if (!ros::ok())
             {
@@ -38,29 +38,30 @@ namespace ratio::ros
             exec.second->tick();
     }
 
-    void deliberative_manager::create_reasoner(aerials::ReasonerBuilder::Request &req, aerials::ReasonerBuilder::Response &res)
+    bool deliberative_manager::create_reasoner(aerials::ReasonerBuilder::Request &req, aerials::ReasonerBuilder::Response &res)
     {
         res.reasoner_id = executors.size();
         ROS_DEBUG("Creating new reasoner #%lu..", res.reasoner_id);
 
         executors[res.reasoner_id] = std::make_unique<deliberative_executor>(*this, res.reasoner_id, req.domain_files, req.requirements);
-        res.consistent = executors[res.reasoner_id].current_state != aerials::DeliberativeState::INCONSISTENT;
+        res.consistent = executors[res.reasoner_id]->current_state != aerials::DeliberativeState::INCONSISTENT;
+        return true;
     }
 
-    void deliberative_manager::executor(aerials::Executor::Request &req, aerials::Executor::Response &res)
+    bool deliberative_manager::executor(aerials::Executor::Request &req, aerials::Executor::Response &res)
     {
         ROS_DEBUG("Staarting execution for reasoner #%lu..", req.reasoner_id);
         if (const auto exec = executors.find(req.reasoner_id); exec != executors.end())
         {
             switch (req.command)
             {
-            case aerials::srv::Executor::Request::START:
+            case aerials::Executor::Request::START:
                 exec->second->start_execution(req.notify_start, req.notify_end);
                 break;
-            case aerials::srv::Executor::Request::PAUSE:
+            case aerials::Executor::Request::PAUSE:
                 exec->second->pause_execution();
                 break;
-            case aerials::srv::Executor::Request::STOP:
+            case aerials::Executor::Request::STOP:
                 exec->second->stop_execution();
                 break;
             }
@@ -71,9 +72,10 @@ namespace ratio::ros
             ROS_WARN("Reasoner #%lu does not exists..", req.reasoner_id);
             res.new_state = aerials::DeliberativeState::DESTROYED;
         }
+        return true;
     }
 
-    void deliberative_manager::destroy_reasoner(aerials::ReasonerDestroyer::Request &req, aerials::ReasonerDestroyer::Response &res)
+    bool deliberative_manager::destroy_reasoner(aerials::ReasonerDestroyer::Request &req, aerials::ReasonerDestroyer::Response &res)
     {
         ROS_DEBUG("Destroying reasoner #%lu..", req.reasoner_id);
         if (const auto exec = executors.find(req.reasoner_id); exec != executors.end())
@@ -91,9 +93,10 @@ namespace ratio::ros
             ROS_WARN("Reasoner #%lu does not exists..", req.reasoner_id);
             res.destroyed = false;
         }
+        return true;
     }
 
-    void deliberative_manager::new_requirements(aerials::RequirementManager::Request &req, aerials::RequirementManager::Response &res)
+    bool deliberative_manager::new_requirements(aerials::RequirementManager::Request &req, aerials::RequirementManager::Response &res)
     {
         ROS_DEBUG("Adding new requirements to reasoner #%lu..", req.reasoner_id);
         if (const auto exec = executors.find(req.reasoner_id); exec != executors.end())
@@ -106,9 +109,10 @@ namespace ratio::ros
             ROS_WARN("Reasoner #%lu does not exist..", req.reasoner_id);
             res.consistent = false;
         }
+        return true;
     }
 
-    void deliberative_manager::lengthen_task(aerials::TaskLengthener::Request &req, aerials::TaskLengthener::Response &res)
+    bool deliberative_manager::lengthen_task(aerials::TaskLengthener::Request &req, aerials::TaskLengthener::Response &res)
     {
         ROS_DEBUG("Stretching task %lu of reasoner #%lu..", req.task.task_id, req.task.reasoner_id);
         if (const auto exec = executors.find(req.task.reasoner_id); exec != executors.end())
@@ -121,9 +125,10 @@ namespace ratio::ros
             ROS_WARN("Reasoner #%lu does not exist..", req.task.reasoner_id);
             res.lengthened = false;
         }
+        return true;
     }
 
-    void deliberative_manager::close_task(aerials::TaskCloser::Request &req, aerials::TaskCloser::Response &res)
+    bool deliberative_manager::close_task(aerials::TaskCloser::Request &req, aerials::TaskCloser::Response &res)
     {
         ROS_DEBUG("Closing task %lu of reasoner #%lu..", req.task.task_id, req.task.reasoner_id);
         if (const auto exec = executors.find(req.task.reasoner_id); exec != executors.end())
@@ -136,5 +141,6 @@ namespace ratio::ros
             ROS_WARN("Reasoner #%lu does not exist..", req.task.reasoner_id);
             res.closed = false;
         }
+        return true;
     }
-} // namespace ratio::ros
+} // namespace ratio::ros1

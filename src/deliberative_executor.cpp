@@ -3,7 +3,7 @@
 #include "predicate.h"
 #include "item.h"
 
-namespace ratio::ros
+namespace ratio::ros1
 {
     deliberative_executor::deliberative_executor(deliberative_manager &d_mngr, const uint64_t &id, const std::vector<std::string> &domain_files, const std::vector<std::string> &requirements) : d_mngr(d_mngr), reasoner_id(id), slv(), exec(slv), dcl(*this), dsl(*this), del(*this)
     { // a new reasoner has just been created..
@@ -275,28 +275,15 @@ namespace ratio::ros
         }
     }
     void deliberative_executor::deliberative_executor_listener::starting(const std::unordered_set<ratio::core::atom *> &atms)
-    {
-        auto request = std::make_shared<aerials::srv::TaskExecutor::Request>();
-        std::vector<std::pair<rclcpp::Client<aerials::srv::TaskExecutor>::FutureAndRequestId, ratio::core::atom *>> futures;
-        futures.reserve(atms.size());
+    { // we tell the executor the atoms which are not yet ready to start..
+        std::unordered_map<const ratio::core::atom *, semitone::rational> dsy;
+        auto tsk_exec = aerials::TaskExecutor();
         for (const auto &atm : atms)
             if (exec.notify_start.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
             {
-                request->task = exec.to_task(*atm);
-                futures.push_back({std::move(exec.d_mngr.can_start->async_send_request(request)), atm});
-            }
-        // we tell the executor the atoms which are not yet ready to start..
-        std::unordered_map<const ratio::core::atom *, semitone::rational> dsy;
-        for (auto &[ftr, atm] : futures)
-            if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
-            {
-                auto result = ftr.get();
-                if (!result->success)
-                    dsy[atm] = result->delay.den == 0 ? semitone::rational(1) : semitone::rational(result->delay.num, result->delay.den);
-            }
-            else
-            {
-                ROS_ERROR("Failed to call service `%s`", exec.d_mngr.can_start->get_service_name());
+                tsk_exec.request.task = exec.to_task(*atm);
+                if (exec.d_mngr.can_start.call(tsk_exec) && !tsk_exec.response.success)
+                    dsy[atm] = tsk_exec.response.delay.den == 0 ? semitone::rational(1) : semitone::rational(tsk_exec.response.delay.num, tsk_exec.response.delay.den);
             }
 
         if (!dsy.empty())
@@ -304,31 +291,16 @@ namespace ratio::ros
     }
     void deliberative_executor::deliberative_executor_listener::start(const std::unordered_set<ratio::core::atom *> &atms)
     {
-        auto request = std::make_shared<aerials::srv::TaskExecutor::Request>();
-        std::vector<std::pair<rclcpp::Client<aerials::srv::TaskExecutor>::FutureAndRequestId, ratio::core::atom *>> futures;
-        futures.reserve(atms.size());
+        auto tsk_exec = aerials::TaskExecutor();
         for (const auto &atm : atms)
             if (exec.notify_start.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
             {
-                request->task = exec.to_task(*atm);
-                futures.push_back({std::move(exec.d_mngr.start_task->async_send_request(request)), atm});
+                tsk_exec.request.task = exec.to_task(*atm);
+                if (exec.d_mngr.start_task.call(tsk_exec) && !tsk_exec.response.success)
+                    exec.current_tasks.emplace(get_id(*atm), atm);
             }
             else if (exec.notify_end.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
                 exec.current_tasks.emplace(get_id(*atm), atm);
-        for (auto &[ftr, atm] : futures)
-            if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
-            {
-                if (ftr.get()->success)
-                    exec.current_tasks.emplace(get_id(*atm), atm);
-                else
-                {
-                    ROS_WARN("Failed to start task `%s`", atm->get_type().get_name().c_str());
-                }
-            }
-            else
-            {
-                ROS_ERROR("Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
-            }
 
         auto timelines_msg = deliberative_tier::Timelines();
         timelines_msg.reasoner_id = exec.reasoner_id;
@@ -339,28 +311,15 @@ namespace ratio::ros
     }
 
     void deliberative_executor::deliberative_executor_listener::ending(const std::unordered_set<ratio::core::atom *> &atms)
-    {
-        auto request = std::make_shared<aerials::srv::TaskExecutor::Request>();
-        std::vector<std::pair<rclcpp::Client<aerials::srv::TaskExecutor>::FutureAndRequestId, ratio::core::atom *>> futures;
-        futures.reserve(atms.size());
+    { // we tell the executor the atoms which are not yet ready to end..
+        std::unordered_map<const ratio::core::atom *, semitone::rational> dey;
+        auto tsk_exec = aerials::TaskExecutor();
         for (const auto &atm : atms)
             if (exec.notify_end.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
             {
-                request->task = exec.to_task(*atm);
-                futures.push_back({std::move(exec.d_mngr.can_end->async_send_request(request)), atm});
-            }
-        // we tell the executor the atoms which are not yet ready to end..
-        std::unordered_map<const ratio::core::atom *, semitone::rational> dey;
-        for (auto &[ftr, atm] : futures)
-            if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
-            {
-                auto result = ftr.get();
-                if (!result->success)
-                    dey[atm] = result->delay.den == 0 ? semitone::rational(1) : semitone::rational(result->delay.num, result->delay.den);
-            }
-            else
-            {
-                ROS_ERROR("Failed to call service `%s`", exec.d_mngr.can_end->get_service_name());
+                tsk_exec.request.task = exec.to_task(*atm);
+                if (exec.d_mngr.can_end.call(tsk_exec) && !tsk_exec.response.success)
+                    dey[atm] = tsk_exec.response.delay.den == 0 ? semitone::rational(1) : semitone::rational(tsk_exec.response.delay.num, tsk_exec.response.delay.den);
             }
 
         if (!dey.empty())
@@ -368,31 +327,14 @@ namespace ratio::ros
     }
     void deliberative_executor::deliberative_executor_listener::end(const std::unordered_set<ratio::core::atom *> &atms)
     {
-        auto request = std::make_shared<aerials::srv::TaskExecutor::Request>();
-        std::vector<std::pair<rclcpp::Client<aerials::srv::TaskExecutor>::FutureAndRequestId, ratio::core::atom *>> futures;
-        futures.reserve(atms.size());
+        auto tsk_exec = aerials::TaskExecutor();
         for (const auto &atm : atms)
             if (exec.notify_end.count(static_cast<ratio::core::predicate *>(&atm->get_type())))
             {
-                request->task = exec.to_task(*atm);
-                futures.push_back({std::move(exec.d_mngr.end_task->async_send_request(request)), atm});
+                tsk_exec.request.task = exec.to_task(*atm);
+                if (exec.d_mngr.end_task.call(tsk_exec) && tsk_exec.response.success)
+                    exec.current_tasks.erase(get_id(*atm));
             }
-        for (auto &[ftr, atm] : futures)
-            if (rclcpp::spin_until_future_complete(exec.d_mngr.node, ftr) == rclcpp::FutureReturnCode::SUCCESS)
-            {
-                if (!ftr.get()->success)
-                {
-                    ROS_WARN("Failed to end task `%s`", atm->get_type().get_name().c_str());
-                }
-            }
-            else
-            {
-                ROS_ERROR("Failed to call service `%s`", exec.d_mngr.end_task->get_service_name());
-            }
-
-        // these atoms are now ended..
-        for (const auto &atm : atms)
-            exec.current_tasks.erase(get_id(*atm));
 
         auto timelines_msg = deliberative_tier::Timelines();
         timelines_msg.reasoner_id = exec.reasoner_id;
@@ -523,4 +465,4 @@ namespace ratio::ros
         g_msg.update = deliberative_tier::Graph::CAUSAL_LINK_ADDED;
         exec.d_mngr.graph_publisher.publish(g_msg);
     }
-} // namespace ratio::ros
+} // namespace ratio::ros1

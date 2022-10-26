@@ -4,7 +4,7 @@
 #include "aerials/Task.h"
 #include "aerials/DeliberativeState.h"
 
-namespace ratio::ros
+namespace ratio::ros1
 {
   class deliberative_manager;
 
@@ -107,4 +107,4 @@ namespace ratio::ros
     const ratio::solver::resolver *current_resolver = nullptr;
     semitone::rational current_time;
   };
-} // namespace ratio::ros
+} // namespace ratio::ros1
