@@ -15,17 +15,15 @@ namespace ratio::ros1
             {
                 ROS_DEBUG("[%lu] %s", reasoner_id, domain_file.c_str());
             }
-            slv.read(domain_files);
+            exec.adapt(domain_files);
 
             // we read the requirements..
             ROS_DEBUG("[%lu] Reading requirements..", reasoner_id);
             for (const auto &requirement : requirements)
             {
                 ROS_DEBUG("[%lu] %s", reasoner_id, requirement.c_str());
-                slv.read(requirement);
+                exec.adapt(requirement);
             }
-
-            pending_requirements = true;
         }
         catch (const ratio::core::inconsistency_exception &e)
         { // the problem is inconsistent..
@@ -64,11 +62,6 @@ namespace ratio::ros1
     }
     void deliberative_executor::tick()
     {
-        if (pending_requirements)
-        { // we solve the problem again..
-            slv.solve();
-            pending_requirements = false;
-        }
         if (current_state == aerials::DeliberativeState::EXECUTING)
             exec.tick();
     }
@@ -88,10 +81,8 @@ namespace ratio::ros1
             for (const auto &requirement : requirements)
             {
                 ROS_DEBUG("[%lu] %s", reasoner_id, requirement.c_str());
-                slv.read(requirement);
+                exec.adapt(requirement);
             }
-
-            pending_requirements = true;
         }
         catch (const ratio::core::inconsistency_exception &e)
         { // the problem is inconsistent..
@@ -266,13 +257,6 @@ namespace ratio::ros1
         timelines_msg.time.num = exec.current_time.numerator();
         timelines_msg.time.den = exec.current_time.denominator();
         exec.d_mngr.timelines_publisher.publish(timelines_msg);
-
-        auto horizon = exec.slv.ratio::core::env::get("horizon");
-        if (exec.slv.ratio::core::core::arith_value(horizon) <= exec.exec.get_current_time() && exec.current_tasks.empty())
-        {
-            ROS_DEBUG("[%lu] Exhausted plan..", exec.reasoner_id);
-            exec.set_state(aerials::DeliberativeState::FINISHED);
-        }
     }
     void deliberative_executor::deliberative_executor_listener::starting(const std::unordered_set<ratio::core::atom *> &atms)
     { // we tell the executor the atoms which are not yet ready to start..
@@ -342,6 +326,15 @@ namespace ratio::ros1
         for (const auto &[id, atm] : exec.current_tasks)
             timelines_msg.executing.push_back(id);
         exec.d_mngr.timelines_publisher.publish(timelines_msg);
+    }
+
+    void deliberative_executor::deliberative_executor_listener::finished()
+    {
+        if (exec.current_state != aerials::DeliberativeState::FINISHED)
+        {
+            ROS_DEBUG("[%lu] Exhausted plan..", exec.reasoner_id);
+            exec.set_state(aerials::DeliberativeState::FINISHED);
+        }
     }
 
     deliberative_executor::deliberative_solver_listener::deliberative_solver_listener(deliberative_executor &de) : solver_listener(de.get_solver()), exec(de) {}
