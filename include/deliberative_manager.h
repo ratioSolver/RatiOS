@@ -6,7 +6,7 @@
 #include "aerials/srv/executor.hpp"
 #include "aerials/srv/requirement_manager.hpp"
 #include "aerials/srv/task_executor.hpp"
-#include "aerials/srv/task_lengthener.hpp"
+#include "aerials/srv/task_delayer.hpp"
 #include "aerials/srv/task_closer.hpp"
 #include "deliberative_tier/msg/graph.hpp"
 #include "deliberative_tier/msg/timelines.hpp"
@@ -31,7 +31,8 @@ namespace ratio::ros
     void executor(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::Executor::Request> req, std::shared_ptr<aerials::srv::Executor::Response> res);
     void destroy_reasoner(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::ReasonerDestroyer::Request> req, std::shared_ptr<aerials::srv::ReasonerDestroyer::Response> res);
     void new_requirements(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::RequirementManager::Request> req, std::shared_ptr<aerials::srv::RequirementManager::Response> res);
-    void lengthen_task(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskLengthener::Request> req, std::shared_ptr<aerials::srv::TaskLengthener::Response> res);
+    void delay_task(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskDelayer::Request> req, std::shared_ptr<aerials::srv::TaskDelayer::Response> res);
+    void extend_task(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskDelayer::Request> req, std::shared_ptr<aerials::srv::TaskDelayer::Response> res);
     void close_task(const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskCloser::Request> req, std::shared_ptr<aerials::srv::TaskCloser::Response> res);
 
   private:
@@ -41,7 +42,8 @@ namespace ratio::ros
     rclcpp::Service<aerials::srv::Executor>::SharedPtr start_execution_server = node->create_service<aerials::srv::Executor>("executor", std::bind(&deliberative_manager::executor, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Service<aerials::srv::ReasonerDestroyer>::SharedPtr reasoner_destroyer_server = node->create_service<aerials::srv::ReasonerDestroyer>("reasoner_destroyer", std::bind(&deliberative_manager::destroy_reasoner, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Service<aerials::srv::RequirementManager>::SharedPtr requirement_manager_server = node->create_service<aerials::srv::RequirementManager>("requirement_manager", std::bind(&deliberative_manager::new_requirements, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-    rclcpp::Service<aerials::srv::TaskLengthener>::SharedPtr task_lengthener_server = node->create_service<aerials::srv::TaskLengthener>("task_lengthner", std::bind(&deliberative_manager::lengthen_task, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    rclcpp::Service<aerials::srv::TaskDelayer>::SharedPtr task_delayer_server = node->create_service<aerials::srv::TaskDelayer>("task_delayer", std::bind(&deliberative_manager::delay_task, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    rclcpp::Service<aerials::srv::TaskDelayer>::SharedPtr task_extender_server = node->create_service<aerials::srv::TaskDelayer>("task_extender", std::bind(&deliberative_manager::extend_task, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Service<aerials::srv::TaskCloser>::SharedPtr task_closer_server = node->create_service<aerials::srv::TaskCloser>("task_closer", std::bind(&deliberative_manager::close_task, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     rclcpp::Publisher<aerials::msg::DeliberativeState>::SharedPtr state_publisher = node->create_publisher<aerials::msg::DeliberativeState>("deliberative_state", rclcpp::QoS(10).transient_local());
     rclcpp::Publisher<deliberative_tier::msg::Graph>::SharedPtr graph_publisher = node->create_publisher<deliberative_tier::msg::Graph>("graph", rclcpp::QoS(10).transient_local());

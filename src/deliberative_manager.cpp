@@ -45,9 +45,6 @@ namespace ratio::ros
             case aerials::srv::Executor::Request::PAUSE:
                 exec->second->pause_execution();
                 break;
-            case aerials::srv::Executor::Request::STOP:
-                exec->second->stop_execution();
-                break;
             }
             res->new_state = exec->second->current_state;
         }
@@ -93,18 +90,33 @@ namespace ratio::ros
         }
     }
 
-    void deliberative_manager::lengthen_task([[maybe_unused]] const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskLengthener::Request> req, std::shared_ptr<aerials::srv::TaskLengthener::Response> res)
+    void deliberative_manager::delay_task([[maybe_unused]] const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskDelayer::Request> req, std::shared_ptr<aerials::srv::TaskDelayer::Response> res)
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Stretching task %lu of reasoner #%lu..", req->task.task_id, req->task.reasoner_id);
+        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Delaying task %lu of reasoner #%lu..", req->task.task_id, req->task.reasoner_id);
         if (const auto exec = executors.find(req->task.reasoner_id); exec != executors.end())
         {
-            exec->second->lengthen_task(req->task.task_id, semitone::rational(req->delay.num, req->delay.den));
-            res->lengthened = true;
+            exec->second->delay_task(req->task.task_id, semitone::rational(req->delay.num, req->delay.den));
+            res->delayed = true;
         }
         else
         {
             RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Reasoner #%lu does not exist..", req->task.reasoner_id);
-            res->lengthened = false;
+            res->delayed = false;
+        }
+    }
+
+    void deliberative_manager::extend_task([[maybe_unused]] const std::shared_ptr<rmw_request_id_t> request_header, const std::shared_ptr<aerials::srv::TaskDelayer::Request> req, std::shared_ptr<aerials::srv::TaskDelayer::Response> res)
+    {
+        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Extending task %lu of reasoner #%lu..", req->task.task_id, req->task.reasoner_id);
+        if (const auto exec = executors.find(req->task.reasoner_id); exec != executors.end())
+        {
+            exec->second->extend_task(req->task.task_id, semitone::rational(req->delay.num, req->delay.den));
+            res->delayed = true;
+        }
+        else
+        {
+            RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Reasoner #%lu does not exist..", req->task.reasoner_id);
+            res->delayed = false;
         }
     }
 

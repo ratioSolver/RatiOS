@@ -7,6 +7,7 @@ namespace ratio::ros
 {
     deliberative_executor::deliberative_executor(deliberative_manager &d_mngr, const uint64_t &id, const std::vector<std::string> &domain_files, const std::vector<std::string> &requirements) : d_mngr(d_mngr), reasoner_id(id), slv(), exec(slv), dcl(*this), dsl(*this), del(*this)
     { // a new reasoner has just been created..
+        set_state(aerials::msg::DeliberativeState::REASONING);
         try
         {
             // we read the domain files..
@@ -53,18 +54,9 @@ namespace ratio::ros
     void deliberative_executor::pause_execution()
     {
         RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Pausing execution..", reasoner_id);
-        set_state(aerials::msg::DeliberativeState::PAUSED);
+        set_state(aerials::msg::DeliberativeState::IDLE);
     }
-    void deliberative_executor::stop_execution()
-    {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Stopping execution..", reasoner_id);
-        set_state(aerials::msg::DeliberativeState::STOPPED);
-    }
-    void deliberative_executor::tick()
-    {
-        if (current_state == aerials::msg::DeliberativeState::EXECUTING)
-            exec.tick();
-    }
+    void deliberative_executor::tick() { exec.tick(); }
     void deliberative_executor::append_requirements(const std::vector<std::string> &requirements)
     {
         if (current_state == aerials::msg::DeliberativeState::INCONSISTENT)
@@ -74,9 +66,7 @@ namespace ratio::ros
         }
         try
         {
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Going at root level..", reasoner_id);
-            while (!slv.root_level()) // we go at root level..
-                slv.get_sat_core()->pop();
+            set_state(aerials::msg::DeliberativeState::ADAPTING);
             RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Reading requirements..", reasoner_id);
             for (const auto &requirement : requirements)
             {
@@ -95,17 +85,20 @@ namespace ratio::ros
             set_state(aerials::msg::DeliberativeState::INCONSISTENT);
         }
     }
-    void deliberative_executor::lengthen_task(const uintptr_t &id, const semitone::rational &delay)
+    void deliberative_executor::delay_task(const uintptr_t &id, const semitone::rational &delay)
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Lengthning task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
+        std::unordered_map<const ratio::core::atom *, semitone::rational> dsy;
+        dsy[current_tasks.at(id)] = delay;
+        exec.dont_start_yet(dsy);
+    }
+    void deliberative_executor::extend_task(const uintptr_t &id, const semitone::rational &delay)
+    {
         std::unordered_map<const ratio::core::atom *, semitone::rational> dey;
         dey[current_tasks.at(id)] = delay;
-        if (!dey.empty())
-            exec.dont_end_yet(dey);
+        exec.dont_end_yet(dey);
     }
     void deliberative_executor::close_task(const uintptr_t &id, const bool &success)
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Closing task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
         if (!success) // the task failed..
             exec.failure({current_tasks.at(id)});
         current_tasks.erase(id);
@@ -113,11 +106,14 @@ namespace ratio::ros
 
     void deliberative_executor::set_state(const unsigned int &st)
     {
-        current_state = st;
-        auto state_msg = aerials::msg::DeliberativeState();
-        state_msg.reasoner_id = reasoner_id;
-        state_msg.deliberative_state = current_state;
-        d_mngr.state_publisher->publish(state_msg);
+        if (current_state != st)
+        {
+            current_state = st;
+            auto state_msg = aerials::msg::DeliberativeState();
+            state_msg.reasoner_id = reasoner_id;
+            state_msg.deliberative_state = current_state;
+            d_mngr.state_publisher->publish(state_msg);
+        }
     }
     ratio::core::predicate &deliberative_executor::get_predicate(const std::string &pred) const
     {
@@ -184,13 +180,9 @@ namespace ratio::ros
     deliberative_executor::deliberative_core_listener::deliberative_core_listener(deliberative_executor &de) : core_listener(de.get_solver()), exec(de) {}
     void deliberative_executor::deliberative_core_listener::started_solving()
     {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Started reasoning..", exec.reasoner_id);
-        if (exec.previous_state == -1u)
-            exec.set_state(aerials::msg::DeliberativeState::REASONING);
-        else
-        { // we remember the current state for restoring it after adaptation..
-            assert(exec.current_state == aerials::msg::DeliberativeState::EXECUTING || exec.current_state == aerials::msg::DeliberativeState::PAUSED || exec.current_state == aerials::msg::DeliberativeState::STOPPED);
-            exec.previous_state = exec.current_state;
+        if (exec.current_state != aerials::msg::DeliberativeState::REASONING)
+        {
+            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Adapting plan..", exec.reasoner_id);
             exec.set_state(aerials::msg::DeliberativeState::ADAPTING);
         }
     }
@@ -220,20 +212,7 @@ namespace ratio::ros
 
         exec.d_mngr.timelines_publisher->publish(timelines_msg);
 
-        switch (exec.previous_state)
-        {
-        case aerials::msg::DeliberativeState::EXECUTING:
-            exec.set_state(aerials::msg::DeliberativeState::EXECUTING);
-            break;
-        case aerials::msg::DeliberativeState::PAUSED:
-            exec.set_state(aerials::msg::DeliberativeState::PAUSED);
-            break;
-        case aerials::msg::DeliberativeState::STOPPED:
-            exec.set_state(aerials::msg::DeliberativeState::STOPPED);
-            break;
-        default:
-            break;
-        }
+        exec.set_state(exec.exec.is_finished() ? aerials::msg::DeliberativeState::FINISHED : (exec.exec.is_executing() ? aerials::msg::DeliberativeState::EXECUTING : aerials::msg::DeliberativeState::IDLE));
     }
     void deliberative_executor::deliberative_core_listener::inconsistent_problem()
     {
@@ -382,15 +361,6 @@ namespace ratio::ros
         for (const auto &[id, atm] : exec.current_tasks)
             timelines_msg.executing.push_back(id);
         exec.d_mngr.timelines_publisher->publish(timelines_msg);
-    }
-
-    void deliberative_executor::deliberative_executor_listener::finished()
-    {
-        if (exec.current_state != aerials::msg::DeliberativeState::FINISHED)
-        {
-            RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "[%lu] Exhausted plan..", exec.reasoner_id);
-            exec.set_state(aerials::msg::DeliberativeState::FINISHED);
-        }
     }
 
     deliberative_executor::deliberative_solver_listener::deliberative_solver_listener(deliberative_executor &de) : solver_listener(de.get_solver()), exec(de) {}
