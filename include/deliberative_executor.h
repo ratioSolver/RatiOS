@@ -21,10 +21,10 @@ namespace ratio::ros1
 
     void start_execution(const std::vector<std::string> &notify_start_ids, const std::vector<std::string> &notify_end_ids);
     void pause_execution();
-    void stop_execution();
     void tick();
     void append_requirements(const std::vector<std::string> &requirements);
-    void lengthen_task(const uintptr_t &id, const semitone::rational &delay = semitone::rational(1));
+    void delay_task(const uintptr_t &id, const semitone::rational &delay = semitone::rational(1));
+    void extend_task(const uintptr_t &id, const semitone::rational &delay = semitone::rational(1));
     void close_task(const uintptr_t &id, const bool &success = true);
 
   private:
@@ -62,8 +62,6 @@ namespace ratio::ros1
       void ending(const std::unordered_set<ratio::core::atom *> &atms) override;
       void end(const std::unordered_set<ratio::core::atom *> &atms) override;
 
-      void finished() override;
-
     private:
       deliberative_executor &exec;
     };
@@ -99,7 +97,6 @@ namespace ratio::ros1
     deliberative_solver_listener dsl;
     deliberative_executor_listener del;
     unsigned int current_state;
-    unsigned int previous_state = -1;
     std::unordered_set<const ratio::core::predicate *> notify_start, notify_end;
     std::unordered_map<uintptr_t, const ratio::core::atom *> current_tasks;
     std::unordered_set<const ratio::solver::flaw *> flaws;

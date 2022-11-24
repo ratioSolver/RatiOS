@@ -5,7 +5,7 @@
 #include "aerials/Executor.h"
 #include "aerials/RequirementManager.h"
 #include "aerials/TaskExecutor.h"
-#include "aerials/TaskLengthener.h"
+#include "aerials/TaskDelayer.h"
 #include "aerials/TaskCloser.h"
 #include "deliberative_tier/Graph.h"
 #include "deliberative_tier/Timelines.h"
@@ -31,7 +31,8 @@ namespace ratio::ros1
     bool executor(aerials::Executor::Request &req, aerials::Executor::Response &res);
     bool destroy_reasoner(aerials::ReasonerDestroyer::Request &req, aerials::ReasonerDestroyer::Response &res);
     bool new_requirements(aerials::RequirementManager::Request &req, aerials::RequirementManager::Response &res);
-    bool lengthen_task(aerials::TaskLengthener::Request &req, aerials::TaskLengthener::Response &res);
+    bool delay_task(aerials::TaskDelayer::Request &req, aerials::TaskDelayer::Response &res);
+    bool extend_task(aerials::TaskDelayer::Request &req, aerials::TaskDelayer::Response &res);
     bool close_task(aerials::TaskCloser::Request &req, aerials::TaskCloser::Response &res);
 
   private:
@@ -41,7 +42,8 @@ namespace ratio::ros1
     ros::ServiceServer start_execution_server;
     ros::ServiceServer reasoner_destroyer_server;
     ros::ServiceServer requirement_manager_server;
-    ros::ServiceServer task_lengthener_server;
+    ros::ServiceServer task_delayer_server;
+    ros::ServiceServer task_extender_server;
     ros::ServiceServer task_closer_server;
     ros::Publisher state_publisher;
     ros::Publisher graph_publisher;

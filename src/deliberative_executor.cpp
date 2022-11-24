@@ -7,6 +7,7 @@ namespace ratio::ros1
 {
     deliberative_executor::deliberative_executor(deliberative_manager &d_mngr, const uint64_t &id, const std::vector<std::string> &domain_files, const std::vector<std::string> &requirements) : d_mngr(d_mngr), reasoner_id(id), slv(), exec(slv), dcl(*this), dsl(*this), del(*this)
     { // a new reasoner has just been created..
+        set_state(aerials::DeliberativeState::REASONING);
         try
         {
             // we read the domain files..
@@ -53,18 +54,9 @@ namespace ratio::ros1
     void deliberative_executor::pause_execution()
     {
         ROS_DEBUG("[%lu] Pausing execution..", reasoner_id);
-        set_state(aerials::DeliberativeState::PAUSED);
+        set_state(aerials::DeliberativeState::IDLE);
     }
-    void deliberative_executor::stop_execution()
-    {
-        ROS_DEBUG("[%lu] Stopping execution..", reasoner_id);
-        set_state(aerials::DeliberativeState::STOPPED);
-    }
-    void deliberative_executor::tick()
-    {
-        if (current_state == aerials::DeliberativeState::EXECUTING)
-            exec.tick();
-    }
+    void deliberative_executor::tick() { exec.tick(); }
     void deliberative_executor::append_requirements(const std::vector<std::string> &requirements)
     {
         if (current_state == aerials::DeliberativeState::INCONSISTENT)
@@ -95,17 +87,20 @@ namespace ratio::ros1
             set_state(aerials::DeliberativeState::INCONSISTENT);
         }
     }
-    void deliberative_executor::lengthen_task(const uintptr_t &id, const semitone::rational &delay)
+    void deliberative_executor::delay_task(const uintptr_t &id, const semitone::rational &delay)
     {
-        ROS_DEBUG("[%lu] Lengthning task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
+        std::unordered_map<const ratio::core::atom *, semitone::rational> dsy;
+        dsy[current_tasks.at(id)] = delay;
+        exec.dont_end_yet(dsy);
+    }
+    void deliberative_executor::extend_task(const uintptr_t &id, const semitone::rational &delay)
+    {
         std::unordered_map<const ratio::core::atom *, semitone::rational> dey;
         dey[current_tasks.at(id)] = delay;
-        if (!dey.empty())
-            exec.dont_end_yet(dey);
+        exec.dont_end_yet(dey);
     }
     void deliberative_executor::close_task(const uintptr_t &id, const bool &success)
     {
-        ROS_DEBUG("[%lu] Closing task %s..", reasoner_id, current_tasks.at(id)->get_type().get_name().c_str());
         if (!success) // the task failed..
             exec.failure({current_tasks.at(id)});
         current_tasks.erase(id);
@@ -113,11 +108,14 @@ namespace ratio::ros1
 
     void deliberative_executor::set_state(const unsigned int &st)
     {
-        current_state = st;
-        auto state_msg = aerials::DeliberativeState();
-        state_msg.reasoner_id = reasoner_id;
-        state_msg.deliberative_state = current_state;
-        d_mngr.state_publisher.publish(state_msg);
+        if (current_state != st)
+        {
+            current_state = st;
+            auto state_msg = aerials::DeliberativeState();
+            state_msg.reasoner_id = reasoner_id;
+            state_msg.deliberative_state = current_state;
+            d_mngr.state_publisher.publish(state_msg);
+        }
     }
     ratio::core::predicate &deliberative_executor::get_predicate(const std::string &pred) const
     {
@@ -184,13 +182,9 @@ namespace ratio::ros1
     deliberative_executor::deliberative_core_listener::deliberative_core_listener(deliberative_executor &de) : core_listener(de.get_solver()), exec(de) {}
     void deliberative_executor::deliberative_core_listener::started_solving()
     {
-        ROS_DEBUG("[%lu] Started reasoning..", exec.reasoner_id);
-        if (exec.previous_state == -1u)
-            exec.set_state(aerials::DeliberativeState::REASONING);
-        else
-        { // we remember the current state for restoring it after adaptation..
-            assert(exec.current_state == aerials::DeliberativeState::EXECUTING || exec.current_state == aerials::DeliberativeState::PAUSED || exec.current_state == aerials::DeliberativeState::STOPPED);
-            exec.previous_state = exec.current_state;
+        if (exec.current_state != aerials::DeliberativeState::REASONING)
+        {
+            ROS_DEBUG("[%lu] Adapting plan..", exec.reasoner_id);
             exec.set_state(aerials::DeliberativeState::ADAPTING);
         }
     }
@@ -220,20 +214,7 @@ namespace ratio::ros1
 
         exec.d_mngr.timelines_publisher.publish(timelines_msg);
 
-        switch (exec.previous_state)
-        {
-        case aerials::DeliberativeState::EXECUTING:
-            exec.set_state(aerials::DeliberativeState::EXECUTING);
-            break;
-        case aerials::DeliberativeState::PAUSED:
-            exec.set_state(aerials::DeliberativeState::PAUSED);
-            break;
-        case aerials::DeliberativeState::STOPPED:
-            exec.set_state(aerials::DeliberativeState::STOPPED);
-            break;
-        default:
-            break;
-        }
+        exec.set_state(exec.exec.is_finished() ? aerials::DeliberativeState::FINISHED : (exec.exec.is_executing() ? aerials::DeliberativeState::EXECUTING : aerials::DeliberativeState::IDLE));
     }
     void deliberative_executor::deliberative_core_listener::inconsistent_problem()
     {
@@ -326,15 +307,6 @@ namespace ratio::ros1
         for (const auto &[id, atm] : exec.current_tasks)
             timelines_msg.executing.push_back(id);
         exec.d_mngr.timelines_publisher.publish(timelines_msg);
-    }
-
-    void deliberative_executor::deliberative_executor_listener::finished()
-    {
-        if (exec.current_state != aerials::DeliberativeState::FINISHED)
-        {
-            ROS_DEBUG("[%lu] Exhausted plan..", exec.reasoner_id);
-            exec.set_state(aerials::DeliberativeState::FINISHED);
-        }
     }
 
     deliberative_executor::deliberative_solver_listener::deliberative_solver_listener(deliberative_executor &de) : solver_listener(de.get_solver()), exec(de) {}

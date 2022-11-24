@@ -10,7 +10,8 @@ namespace ratio::ros1
                                                                      start_execution_server(h.advertiseService("executor", &deliberative_manager::executor, this)),
                                                                      reasoner_destroyer_server(h.advertiseService("reasoner_destroyer", &deliberative_manager::destroy_reasoner, this)),
                                                                      requirement_manager_server(h.advertiseService("requirement_manager", &deliberative_manager::new_requirements, this)),
-                                                                     task_lengthener_server(h.advertiseService("task_lengthner", &deliberative_manager::lengthen_task, this)),
+                                                                     task_delayer_server(h.advertiseService("task_delayer", &deliberative_manager::delay_task, this)),
+                                                                     task_extender_server(h.advertiseService("task_extender", &deliberative_manager::extend_task, this)),
                                                                      task_closer_server(h.advertiseService("task_closer", &deliberative_manager::close_task, this)),
                                                                      state_publisher(h.advertise<aerials::DeliberativeState>("deliberative_state", 10, true)),
                                                                      graph_publisher(h.advertise<deliberative_tier::Graph>("graph", 10)),
@@ -61,9 +62,6 @@ namespace ratio::ros1
             case aerials::Executor::Request::PAUSE:
                 exec->second->pause_execution();
                 break;
-            case aerials::Executor::Request::STOP:
-                exec->second->stop_execution();
-                break;
             }
             res.new_state = exec->second->current_state;
         }
@@ -112,18 +110,34 @@ namespace ratio::ros1
         return true;
     }
 
-    bool deliberative_manager::lengthen_task(aerials::TaskLengthener::Request &req, aerials::TaskLengthener::Response &res)
+    bool deliberative_manager::delay_task(aerials::TaskDelayer::Request &req, aerials::TaskDelayer::Response &res)
     {
-        ROS_DEBUG("Stretching task %lu of reasoner #%lu..", req.task.task_id, req.task.reasoner_id);
+        ROS_DEBUG("Delaying task %lu of reasoner #%lu..", req.task.task_id, req.task.reasoner_id);
         if (const auto exec = executors.find(req.task.reasoner_id); exec != executors.end())
         {
-            exec->second->lengthen_task(req.task.task_id, semitone::rational(req.delay.num, req.delay.den));
-            res.lengthened = true;
+            exec->second->delay_task(req.task.task_id, semitone::rational(req.delay.num, req.delay.den));
+            res.delayed = true;
         }
         else
         {
             ROS_WARN("Reasoner #%lu does not exist..", req.task.reasoner_id);
-            res.lengthened = false;
+            res.delayed = false;
+        }
+        return true;
+    }
+
+    bool deliberative_manager::extend_task(aerials::TaskDelayer::Request &req, aerials::TaskDelayer::Response &res)
+    {
+        ROS_DEBUG("Extending task %lu of reasoner #%lu..", req.task.task_id, req.task.reasoner_id);
+        if (const auto exec = executors.find(req.task.reasoner_id); exec != executors.end())
+        {
+            exec->second->extend_task(req.task.task_id, semitone::rational(req.delay.num, req.delay.den));
+            res.delayed = true;
+        }
+        else
+        {
+            ROS_WARN("Reasoner #%lu does not exist..", req.task.reasoner_id);
+            res.delayed = false;
         }
         return true;
     }
